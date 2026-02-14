@@ -1,10 +1,261 @@
 const { useEffect, useRef, useState } = React;
 
+function PinballGame({ isOpen }) {
+  const canvasRef = useRef(null);
+  const rafRef = useRef(0);
+  const keysRef = useRef({ left: false, right: false });
+  const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(3);
+  const [status, setStatus] = useState("Press Space to launch");
+  const gameRef = useRef(null);
+
+  function resetBall(state) {
+    state.ball = {
+      x: 525,
+      y: 332,
+      vx: 0,
+      vy: 0,
+      r: 8,
+      launched: false,
+    };
+  }
+
+  function resetGame() {
+    const next = {
+      table: { w: 560, h: 360 },
+      ball: null,
+      bumpers: [
+        { x: 178, y: 118, r: 20, points: 50 },
+        { x: 284, y: 156, r: 24, points: 75 },
+        { x: 392, y: 112, r: 20, points: 50 },
+      ],
+      leftPaddle: { x: 136, y: 320, w: 96, h: 14 },
+      rightPaddle: { x: 328, y: 320, w: 96, h: 14 },
+    };
+    resetBall(next);
+    gameRef.current = next;
+    setScore(0);
+    setLives(3);
+    setStatus("Press Space to launch");
+  }
+
+  function launchBall() {
+    const state = gameRef.current;
+    if (!state || state.ball.launched) {
+      return;
+    }
+    state.ball.launched = true;
+    state.ball.vx = -4.6 - Math.random() * 1.6;
+    state.ball.vy = -10.8;
+    setStatus("Use \u2190 and \u2192 to control flippers");
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      cancelAnimationFrame(rafRef.current);
+      return;
+    }
+
+    resetGame();
+
+    function onKeyDown(event) {
+      if (event.key === "ArrowLeft") {
+        keysRef.current.left = true;
+      }
+      if (event.key === "ArrowRight") {
+        keysRef.current.right = true;
+      }
+      if (event.code === "Space") {
+        event.preventDefault();
+        launchBall();
+      }
+      if (event.key.toLowerCase() === "r") {
+        resetGame();
+      }
+    }
+
+    function onKeyUp(event) {
+      if (event.key === "ArrowLeft") {
+        keysRef.current.left = false;
+      }
+      if (event.key === "ArrowRight") {
+        keysRef.current.right = false;
+      }
+    }
+
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) {
+      return undefined;
+    }
+
+    function reflect(velocityX, velocityY, normalX, normalY) {
+      const dot = velocityX * normalX + velocityY * normalY;
+      return {
+        x: velocityX - 2 * dot * normalX,
+        y: velocityY - 2 * dot * normalY,
+      };
+    }
+
+    function animate() {
+      const state = gameRef.current;
+      if (!state) {
+        return;
+      }
+
+      const { table, ball, bumpers, leftPaddle, rightPaddle } = state;
+      const activeLeftY = keysRef.current.left ? 304 : 320;
+      const activeRightY = keysRef.current.right ? 304 : 320;
+
+      if (ball.launched) {
+        ball.vy += 0.19;
+      }
+
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      if (ball.x - ball.r <= 10) {
+        ball.x = 10 + ball.r;
+        ball.vx = Math.abs(ball.vx) * 0.98;
+      }
+      if (ball.x + ball.r >= table.w - 10) {
+        ball.x = table.w - 10 - ball.r;
+        ball.vx = -Math.abs(ball.vx) * 0.98;
+      }
+      if (ball.y - ball.r <= 10) {
+        ball.y = 10 + ball.r;
+        ball.vy = Math.abs(ball.vy) * 0.98;
+      }
+
+      bumpers.forEach((bumper) => {
+        const dx = ball.x - bumper.x;
+        const dy = ball.y - bumper.y;
+        const distance = Math.hypot(dx, dy);
+        const overlap = ball.r + bumper.r - distance;
+        if (overlap > 0) {
+          const nx = dx / (distance || 1);
+          const ny = dy / (distance || 1);
+          ball.x += nx * overlap;
+          ball.y += ny * overlap;
+          const reflected = reflect(ball.vx, ball.vy, nx, ny);
+          ball.vx = reflected.x * 1.05;
+          ball.vy = reflected.y * 1.05;
+          setScore((prev) => prev + bumper.points);
+        }
+      });
+
+      function paddleBounce(paddleX, paddleY, width, isLeft) {
+        const paddleTop = paddleY;
+        const paddleBottom = paddleY + 14;
+        if (
+          ball.y + ball.r >= paddleTop &&
+          ball.y - ball.r <= paddleBottom &&
+          ball.x >= paddleX &&
+          ball.x <= paddleX + width &&
+          ball.vy > 0
+        ) {
+          ball.y = paddleTop - ball.r - 0.5;
+          const hitPos = (ball.x - (paddleX + width / 2)) / (width / 2);
+          const push = isLeft ? -0.8 : 0.8;
+          ball.vx = ball.vx * 0.55 + hitPos * 4.8 + push;
+          ball.vy = -Math.abs(ball.vy) * 0.92 - 1.1;
+          setScore((prev) => prev + 10);
+        }
+      }
+
+      paddleBounce(leftPaddle.x, activeLeftY, leftPaddle.w, true);
+      paddleBounce(rightPaddle.x, activeRightY, rightPaddle.w, false);
+
+      if (ball.y - ball.r > table.h + 24) {
+        setLives((prev) => {
+          const nextLives = prev - 1;
+          if (nextLives <= 0) {
+            setStatus("Game over. Press R to restart");
+            resetGame();
+            return 3;
+          }
+          setStatus("Ball lost. Press Space to relaunch");
+          resetBall(state);
+          return nextLives;
+        });
+      }
+
+      ctx.clearRect(0, 0, table.w, table.h);
+      const bg = ctx.createLinearGradient(0, 0, 0, table.h);
+      bg.addColorStop(0, "#112f68");
+      bg.addColorStop(0.6, "#1f5fb6");
+      bg.addColorStop(1, "#2663b4");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, table.w, table.h);
+
+      ctx.fillStyle = "#0a2d63";
+      ctx.fillRect(10, 10, table.w - 20, table.h - 20);
+
+      const lane = ctx.createLinearGradient(table.w - 68, 14, table.w - 14, table.h - 14);
+      lane.addColorStop(0, "#2d88e3");
+      lane.addColorStop(1, "#0c3f86");
+      ctx.fillStyle = lane;
+      ctx.fillRect(table.w - 64, 14, 50, table.h - 28);
+
+      bumpers.forEach((bumper) => {
+        const glow = ctx.createRadialGradient(bumper.x, bumper.y, 4, bumper.x, bumper.y, bumper.r);
+        glow.addColorStop(0, "#fff3ad");
+        glow.addColorStop(0.5, "#f89a42");
+        glow.addColorStop(1, "#9f2b0d");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(bumper.x, bumper.y, bumper.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.fillStyle = "#e7f5ff";
+      ctx.strokeStyle = "#335985";
+      ctx.lineWidth = 2;
+      ctx.fillRect(leftPaddle.x, activeLeftY, leftPaddle.w, leftPaddle.h);
+      ctx.strokeRect(leftPaddle.x, activeLeftY, leftPaddle.w, leftPaddle.h);
+      ctx.fillRect(rightPaddle.x, activeRightY, rightPaddle.w, rightPaddle.h);
+      ctx.strokeRect(rightPaddle.x, activeRightY, rightPaddle.w, rightPaddle.h);
+
+      ctx.fillStyle = "#f6fbff";
+      ctx.beginPath();
+      ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      rafRef.current = requestAnimationFrame(animate);
+    }
+
+    rafRef.current = requestAnimationFrame(animate);
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="pinball-game">
+      <div className="pinball-toolbar">
+        <span>Score: {score}</span>
+        <span>Lives: {lives}</span>
+        <button type="button" className="pinball-launch-btn" onClick={launchBall}>
+          Launch
+        </button>
+      </div>
+      <canvas ref={canvasRef} className="pinball-canvas" width={560} height={360} />
+      <div className="pinball-status">{status}</div>
+    </div>
+  );
+}
+
 const DEFAULT_ICONS = [
   { id: "computer", label: "My Computer", type: "computer" },
   { id: "recycle", label: "Recycle Bin", type: "recycle-shortcut" },
   { id: "cmd", label: "Command Prompt", type: "cmd-shortcut" },
   { id: "readme", label: "readme.txt", type: "text-file" },
+  { id: "pinball", label: "3D Pinball", type: "pinball-app" },
 ];
 
 function App() {
@@ -18,6 +269,7 @@ function App() {
   const [siteInfo, setSiteInfo] = useState(null);
   const [explorerOpen, setExplorerOpen] = useState(false);
   const [notepadOpen, setNotepadOpen] = useState(false);
+  const [pinballOpen, setPinballOpen] = useState(false);
   const [readmeContent, setReadmeContent] = useState(
     "Welcome to this Windows XP desktop web app.\n\nYou can edit this file. Changes stay until you refresh the page."
   );
@@ -285,6 +537,15 @@ function App() {
     setNotepadOpen(false);
   }
 
+  function openPinball() {
+    setPinballOpen(true);
+    setStartMenuOpen(false);
+  }
+
+  function closePinball() {
+    setPinballOpen(false);
+  }
+
   function changeReadmeFontSize(delta) {
     setReadmeFontSize((prev) => Math.min(28, Math.max(10, prev + delta)));
   }
@@ -454,6 +715,23 @@ function App() {
       );
     }
 
+    if (type === "pinball-app") {
+      return (
+        <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="pinballBg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#5db2ff" />
+              <stop offset="100%" stopColor="#184f96" />
+            </linearGradient>
+          </defs>
+          <rect x="10" y="8" width="44" height="48" rx="8" fill="url(#pinballBg)" stroke="#2e4f7a" strokeWidth="2" />
+          <circle cx="32" cy="23" r="8" fill="#ffd97e" stroke="#9b5f16" strokeWidth="2" />
+          <rect x="16" y="39" width="14" height="5" rx="2" fill="#e8f5ff" />
+          <rect x="34" y="39" width="14" height="5" rx="2" fill="#e8f5ff" />
+        </svg>
+      );
+    }
+
     if (type === "text-file") {
       return (
         <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">
@@ -483,7 +761,13 @@ function App() {
           style={{ left: icon.x, top: icon.y }}
           onPointerDown={(event) => onIconPointerDown(event, icon.id)}
           onDoubleClick={
-            icon.id === "computer" ? openExplorer : icon.id === "readme" ? openReadme : undefined
+            icon.id === "computer"
+              ? openExplorer
+              : icon.id === "readme"
+                ? openReadme
+                : icon.id === "pinball"
+                  ? openPinball
+                  : undefined
           }
           onContextMenu={
             icon.id === "computer" || icon.id === "recycle" || icon.id === "cmd"
@@ -651,6 +935,18 @@ function App() {
         </section>
       )}
 
+      {pinballOpen && (
+        <section className="pinball-window" role="dialog" aria-label="3D Pinball">
+          <div className="window-header">
+            <span className="window-title">3D Pinball for Windows - Space Cadet</span>
+            <button className="close-btn" onClick={closePinball} aria-label="Close Pinball">
+              ×
+            </button>
+          </div>
+          <PinballGame isOpen={pinballOpen} />
+        </section>
+      )}
+
       {startMenuOpen && (
         <section className="start-menu" role="dialog" aria-label="Start menu" onClick={(event) => event.stopPropagation()}>
           <div className="start-menu-top">
@@ -677,6 +973,9 @@ function App() {
               </button>
               <button className="start-item" type="button">
                 My Recent Documents
+              </button>
+              <button className="start-item" type="button" onClick={openPinball}>
+                3D Pinball
               </button>
             </div>
             <div className="start-right">
