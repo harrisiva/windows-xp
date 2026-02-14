@@ -703,6 +703,7 @@ const DEFAULT_ICONS = [
   { id: "recycle", label: "Recycle Bin", type: "recycle-shortcut" },
   { id: "cmd", label: "Command Prompt", type: "cmd-shortcut" },
   { id: "readme", label: "readme.txt", type: "text-file" },
+  { id: "gemini", label: "Gemini API Key", type: "gemini-shortcut" },
   { id: "pinball", label: "3D Pinball", type: "pinball-app" },
   { id: "tetris", label: "Tetris", type: "tetris-app" },
 ];
@@ -747,6 +748,7 @@ function calculateResponsivePinballSize(viewportWidth, viewportHeight, taskbarHe
 }
 
 function App() {
+  const GEMINI_KEY_GLOBAL = "__geminiApiKeySession";
   const TASKBAR_HEIGHT = 40;
   const ICON_WIDTH = 92;
   const ICON_HEIGHT = 96;
@@ -757,12 +759,14 @@ function App() {
   const [siteInfo, setSiteInfo] = useState(null);
   const [explorerOpen, setExplorerOpen] = useState(false);
   const [notepadOpen, setNotepadOpen] = useState(false);
+  const [geminiOpen, setGeminiOpen] = useState(false);
   const [pinballOpen, setPinballOpen] = useState(false);
   const [tetrisOpen, setTetrisOpen] = useState(false);
   const [windowStack, setWindowStack] = useState([
     "properties",
     "explorer",
     "notepad",
+    "gemini",
     "pinball",
     "tetris",
   ]);
@@ -783,6 +787,18 @@ function App() {
     return calculateResponsivePinballSize(viewportWidth, viewportHeight, TASKBAR_HEIGHT);
   });
   const [tetrisPos, setTetrisPos] = useState({ x: 260, y: 96 });
+  const [geminiApiKey, setGeminiApiKey] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+    return window[GEMINI_KEY_GLOBAL] || "";
+  });
+  const [geminiDraft, setGeminiDraft] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+    return window[GEMINI_KEY_GLOBAL] || "";
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [windowPos, setWindowPos] = useState({ x: 120, y: 120 });
@@ -815,6 +831,12 @@ function App() {
   function getWindowZ(windowId) {
     return 30 + windowStack.indexOf(windowId);
   }
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window[GEMINI_KEY_GLOBAL] = geminiApiKey;
+    }
+  }, [geminiApiKey]);
 
   useEffect(() => {
     function closeMenu() {
@@ -1108,6 +1130,20 @@ function App() {
     setNotepadOpen(false);
   }
 
+  function openGeminiKey() {
+    bringWindowToFront("gemini");
+    setGeminiDraft(geminiApiKey);
+    setGeminiOpen(true);
+  }
+
+  function closeGeminiKey() {
+    setGeminiOpen(false);
+  }
+
+  function saveGeminiKey() {
+    setGeminiApiKey(geminiDraft);
+  }
+
   function openPinball() {
     const nextPinballSize = getResponsivePinballSize();
     const centeredX = Math.floor((window.innerWidth - nextPinballSize.width) / 2);
@@ -1363,6 +1399,21 @@ function App() {
       );
     }
 
+    if (type === "gemini-shortcut") {
+      return (
+        <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="geminiBg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f4dcff" />
+              <stop offset="100%" stopColor="#baa1ee" />
+            </linearGradient>
+          </defs>
+          <path d="M32 8l8 14 14 8-14 8-8 14-8-14-14-8 14-8z" fill="url(#geminiBg)" stroke="#6d5aa4" strokeWidth="2" />
+          <circle cx="32" cy="30" r="5" fill="#ffffff" opacity="0.9" />
+        </svg>
+      );
+    }
+
     if (type === "pinball-app") {
       return (
         <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">
@@ -1419,6 +1470,7 @@ function App() {
     (isLoading || error || siteInfo) && { id: "properties", label: "My Computer Properties", kind: "properties" },
     explorerOpen && { id: "explorer", label: "My Computer", kind: "explorer" },
     notepadOpen && { id: "notepad", label: "readme.txt - Notepad", kind: "notepad" },
+    geminiOpen && { id: "gemini", label: "Gemini API Key", kind: "gemini" },
     pinballOpen && { id: "pinball", label: "3D Pinball", kind: "pinball" },
     tetrisOpen && { id: "tetris", label: "Tetris", kind: "tetris" },
   ].filter(Boolean);
@@ -1436,11 +1488,14 @@ function App() {
           className={`icon ${icon.type.endsWith("shortcut") ? "icon--shortcut" : ""}`}
           style={{ left: icon.x, top: icon.y }}
           onPointerDown={(event) => onIconPointerDown(event, icon.id)}
+          onClick={icon.id === "gemini" ? openGeminiKey : undefined}
           onDoubleClick={
             icon.id === "computer"
               ? openExplorer
               : icon.id === "readme"
                 ? openReadme
+                : icon.id === "gemini"
+                  ? openGeminiKey
                 : icon.id === "pinball"
                   ? openPinball
                   : icon.id === "tetris"
@@ -1669,6 +1724,46 @@ function App() {
             onPointerDown={onNotepadResizePointerDown}
             aria-hidden="true"
           />
+        </section>
+      )}
+
+      {geminiOpen && (
+        <section
+          className="gemini-window"
+          style={{ zIndex: getWindowZ("gemini") }}
+          onPointerDown={() => bringWindowToFront("gemini")}
+          role="dialog"
+          aria-label="Gemini API Key"
+        >
+          <div className="window-header">
+            <span className="window-title">Gemini API Key</span>
+            <button className="close-btn" onClick={closeGeminiKey} aria-label="Close Gemini API Key">
+              ×
+            </button>
+          </div>
+          <div className="window-body">
+            <div className="row">
+              <span className="label">API Key:</span>
+            </div>
+            <input
+              className="gemini-input"
+              type="text"
+              value={geminiDraft}
+              onChange={(event) => setGeminiDraft(event.target.value)}
+              placeholder="Paste your Gemini API key"
+            />
+            <div className="gemini-actions">
+              <button className="toolbar-btn" type="button" onClick={saveGeminiKey}>
+                Save Key
+              </button>
+              <button className="toolbar-btn" type="button" onClick={closeGeminiKey}>
+                Close
+              </button>
+            </div>
+            <div className="gemini-status">
+              Current session key: {geminiApiKey || "(none)"}
+            </div>
+          </div>
         </section>
       )}
 
