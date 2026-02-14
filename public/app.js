@@ -772,6 +772,7 @@ function App() {
   ]);
   const [dogBubbleOpen, setDogBubbleOpen] = useState(false);
   const [dogMessageIndex, setDogMessageIndex] = useState(0);
+  const [dogCustomMessage, setDogCustomMessage] = useState("");
   const [readmeContent, setReadmeContent] = useState(
     "Welcome to this Windows XP desktop web app.\n\nYou can edit this file. Changes stay until you refresh the page."
   );
@@ -1153,6 +1154,7 @@ function App() {
   function openGeminiKey() {
     bringWindowToFront("gemini");
     setGeminiDraft(geminiApiKey);
+    setDogCustomMessage("");
     setGeminiOpen(true);
   }
 
@@ -1163,8 +1165,11 @@ function App() {
   function saveGeminiKey() {
     const trimmed = geminiDraft.trim();
     if (!trimmed) {
+      setDogCustomMessage("Woof! I need a Gemini API key before I can save it.");
+      setDogBubbleOpen(true);
       return;
     }
+    setDogCustomMessage("");
     setGeminiApiKey(trimmed);
     setGeminiOpen(false);
   }
@@ -1201,6 +1206,7 @@ function App() {
   }
 
   function onDogClick() {
+    setDogCustomMessage("");
     setDogBubbleOpen((prevOpen) => {
       if (prevOpen) {
         setDogMessageIndex((prev) => (prev + 1) % DOG_MESSAGES.length);
@@ -1581,7 +1587,7 @@ function App() {
         </button>
         {dogBubbleOpen && (
           <div className="xp-dog-bubble" role="status" aria-live="polite">
-            {DOG_MESSAGES[dogMessageIndex]}
+            {dogCustomMessage || DOG_MESSAGES[dogMessageIndex]}
           </div>
         )}
       </section>
@@ -1801,7 +1807,7 @@ function App() {
               placeholder="Paste your Gemini API key"
             />
             <div className="gemini-actions">
-              <button className="toolbar-btn" type="button" onClick={saveGeminiKey} disabled={!geminiDraft.trim()}>
+              <button className="toolbar-btn" type="button" onClick={saveGeminiKey}>
                 Save Key
               </button>
               <button className="toolbar-btn" type="button" onClick={closeGeminiKey}>
