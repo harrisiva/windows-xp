@@ -707,6 +707,38 @@ const DEFAULT_ICONS = [
   { id: "tetris", label: "Tetris", type: "tetris-app" },
 ];
 
+function calculateResponsivePinballSize(viewportWidth, viewportHeight, taskbarHeight) {
+  const margin = 24;
+  const minWindowWidth = 420;
+  const minWindowHeight = 320;
+  const maxWindowWidth = Math.max(320, viewportWidth - margin);
+  const maxWindowHeight = Math.max(300, viewportHeight - taskbarHeight - margin);
+  const clampedMinWidth = Math.min(minWindowWidth, maxWindowWidth);
+  const clampedMinHeight = Math.min(minWindowHeight, maxWindowHeight);
+
+  const canvasAspectWidth = 620;
+  const canvasAspectHeight = 420;
+  const horizontalChrome = 16; // pinball-game horizontal padding
+  const verticalChrome = 100; // title bar + toolbar/status + paddings
+
+  const maxCanvasWidthFromHeight = Math.max(
+    200,
+    Math.floor(((maxWindowHeight - verticalChrome) * canvasAspectWidth) / canvasAspectHeight)
+  );
+  const idealWindowWidth = Math.floor(viewportWidth * 0.56);
+  const fittedWindowWidth = Math.min(maxWindowWidth, maxCanvasWidthFromHeight + horizontalChrome, idealWindowWidth);
+
+  const windowWidth = Math.min(maxWindowWidth, Math.max(clampedMinWidth, fittedWindowWidth));
+  const canvasWidth = Math.max(200, windowWidth - horizontalChrome);
+  const canvasHeight = Math.floor((canvasWidth * canvasAspectHeight) / canvasAspectWidth);
+  const windowHeight = Math.min(
+    maxWindowHeight,
+    Math.max(clampedMinHeight, canvasHeight + verticalChrome)
+  );
+
+  return { width: windowWidth, height: windowHeight };
+}
+
 function App() {
   const TASKBAR_HEIGHT = 40;
   const ICON_WIDTH = 92;
@@ -729,7 +761,11 @@ function App() {
   const [notepadPos, setNotepadPos] = useState({ x: 220, y: 110 });
   const [notepadSize, setNotepadSize] = useState({ width: 620, height: 440 });
   const [pinballPos, setPinballPos] = useState({ x: 200, y: 86 });
-  const [pinballSize, setPinballSize] = useState({ width: 610, height: 500 });
+  const [pinballSize, setPinballSize] = useState(() => {
+    const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
+    const viewportHeight = typeof window === "undefined" ? 800 : window.innerHeight;
+    return calculateResponsivePinballSize(viewportWidth, viewportHeight, TASKBAR_HEIGHT);
+  });
   const [tetrisPos, setTetrisPos] = useState({ x: 260, y: 96 });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -742,6 +778,19 @@ function App() {
   const notepadRef = useRef(null);
   const pinballRef = useRef(null);
   const tetrisRef = useRef(null);
+
+  function getResponsivePinballSize() {
+    return calculateResponsivePinballSize(window.innerWidth, window.innerHeight, TASKBAR_HEIGHT);
+  }
+
+  function clampPinballPositionToViewport(x, y, width, height) {
+    const margin = 12;
+    const maxY = Math.max(margin, window.innerHeight - TASKBAR_HEIGHT - height - margin);
+    return {
+      x: Math.min(Math.max(margin, x), Math.max(margin, window.innerWidth - width - margin)),
+      y: Math.min(Math.max(margin, y), maxY),
+    };
+  }
 
   useEffect(() => {
     function closeMenu() {
@@ -861,21 +910,6 @@ function App() {
       };
     }
 
-    function clampPinballSizeToViewport(width, height, x, y) {
-      const margin = 12;
-      const minWidth = 460;
-      const minHeight = 360;
-      const pinballRect = pinballRef.current?.getBoundingClientRect();
-      const left = x ?? pinballRect?.left ?? 200;
-      const top = y ?? pinballRect?.top ?? 86;
-      const maxWidth = Math.max(minWidth, window.innerWidth - left - margin);
-      const maxHeight = Math.max(minHeight, window.innerHeight - TASKBAR_HEIGHT - top - margin);
-      return {
-        width: Math.min(Math.max(minWidth, width), maxWidth),
-        height: Math.min(Math.max(minHeight, height), maxHeight),
-      };
-    }
-
     function clampTetrisToViewport(x, y, width, height) {
       const margin = 12;
       const tWidth = width || tetrisRef.current?.offsetWidth || 360;
@@ -953,14 +987,6 @@ function App() {
         setNotepadSize(clampNotepadSizeToViewport(nextWidth, nextHeight));
       }
 
-      if (dragState.current.target === "pinball-resize") {
-        const deltaX = event.clientX - dragState.current.startX;
-        const deltaY = event.clientY - dragState.current.startY;
-        const nextWidth = dragState.current.startWidth + deltaX;
-        const nextHeight = dragState.current.startHeight + deltaY;
-        setPinballSize(clampPinballSizeToViewport(nextWidth, nextHeight));
-      }
-
       if (dragState.current.target === "icon") {
         const desktopRect = desktopRef.current?.getBoundingClientRect();
         if (!desktopRect || !dragState.current.id) {
@@ -992,8 +1018,11 @@ function App() {
       setExplorerPos((prev) => clampExplorerToViewport(prev.x, prev.y));
       setNotepadSize((prev) => clampNotepadSizeToViewport(prev.width, prev.height));
       setNotepadPos((prev) => clampNotepadToViewport(prev.x, prev.y));
-      setPinballSize((prev) => clampPinballSizeToViewport(prev.width, prev.height));
-      setPinballPos((prev) => clampPinballToViewport(prev.x, prev.y));
+      const nextPinballSize = getResponsivePinballSize();
+      setPinballSize(nextPinballSize);
+      setPinballPos((prev) =>
+        clampPinballToViewport(prev.x, prev.y, nextPinballSize.width, nextPinballSize.height)
+      );
       setTetrisPos((prev) => clampTetrisToViewport(prev.x, prev.y));
     }
 
@@ -1053,6 +1082,17 @@ function App() {
   }
 
   function openPinball() {
+    const nextPinballSize = getResponsivePinballSize();
+    const centeredX = Math.floor((window.innerWidth - nextPinballSize.width) / 2);
+    const centeredY = Math.max(12, Math.floor((window.innerHeight - TASKBAR_HEIGHT - nextPinballSize.height) / 2));
+    const nextPinballPos = clampPinballPositionToViewport(
+      centeredX,
+      centeredY,
+      nextPinballSize.width,
+      nextPinballSize.height
+    );
+    setPinballSize(nextPinballSize);
+    setPinballPos(nextPinballPos);
     setPinballOpen(true);
     setStartMenuOpen(false);
   }
@@ -1203,22 +1243,6 @@ function App() {
     document.body.classList.add("is-dragging");
   }
 
-  function onPinballResizePointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    dragState.current = {
-      target: "pinball-resize",
-      id: null,
-      startX: event.clientX,
-      startY: event.clientY,
-      startWidth: pinballSize.width,
-      startHeight: pinballSize.height,
-    };
-    document.body.classList.add("is-dragging");
-  }
-
   function onTetrisHeaderPointerDown(event) {
     if (event.button !== 0) {
       return;
@@ -1240,14 +1264,6 @@ function App() {
       offsetY: event.clientY - rect.top,
     };
     document.body.classList.add("is-dragging");
-  }
-
-  function fitPinballToWindow() {
-    setPinballPos({ x: 0, y: 0 });
-    setPinballSize({
-      width: window.innerWidth,
-      height: Math.max(360, window.innerHeight - TASKBAR_HEIGHT),
-    });
   }
 
   function onIconPointerDown(event, iconId) {
@@ -1593,23 +1609,12 @@ function App() {
           <div className="window-header" onPointerDown={onPinballHeaderPointerDown}>
             <span className="window-title">3D Pinball for Windows - Space Cadet</span>
             <div className="window-actions">
-              <button className="fit-btn" onClick={fitPinballToWindow} aria-label="Fit Pinball Window">
-                <svg viewBox="0 0 24 24" className="fit-btn-icon" aria-hidden="true">
-                  <circle cx="12" cy="12" r="9" />
-                  <rect x="8" y="8" width="8" height="8" rx="1" />
-                </svg>
-              </button>
               <button className="close-btn" onClick={closePinball} aria-label="Close Pinball">
                 ×
               </button>
             </div>
           </div>
           <PinballGame isOpen={pinballOpen} />
-          <div
-            className="pinball-resize-handle"
-            onPointerDown={onPinballResizePointerDown}
-            aria-hidden="true"
-          />
         </section>
       )}
 
