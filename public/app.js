@@ -1395,6 +1395,18 @@ function App() {
     );
   }
 
+  const openTaskbarItems = [
+    (isLoading || error || siteInfo) && { id: "properties", label: "My Computer Properties", kind: "properties" },
+    explorerOpen && { id: "explorer", label: "My Computer", kind: "explorer" },
+    notepadOpen && { id: "notepad", label: "readme.txt - Notepad", kind: "notepad" },
+    pinballOpen && { id: "pinball", label: "3D Pinball", kind: "pinball" },
+    tetrisOpen && { id: "tetris", label: "Tetris", kind: "tetris" },
+  ].filter(Boolean);
+
+  function onTaskbarWindowClick() {
+    setStartMenuOpen(false);
+  }
+
   return (
     <main ref={desktopRef} className="desktop">
       {icons.map((icon) => (
@@ -1750,7 +1762,22 @@ function App() {
           </span>
           <span className="start-text">start</span>
         </button>
-        <div className="taskbar-segment" />
+        <div className="taskbar-segment">
+          <div className="taskbar-windows">
+            {openTaskbarItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="taskbar-window-btn"
+                onClick={onTaskbarWindowClick}
+                title={item.label}
+              >
+                <span className={`taskbar-window-dot taskbar-window-dot--${item.kind}`} aria-hidden="true" />
+                <span className="taskbar-window-label">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="taskbar-tray">
           <button className="tray-button" type="button">
             EN
