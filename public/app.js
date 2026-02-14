@@ -801,6 +801,8 @@ function App() {
     }
     return window[GEMINI_KEY_GLOBAL] || "";
   });
+  const [geminiStatus, setGeminiStatus] = useState("inactive");
+  const [geminiStatusMessage, setGeminiStatusMessage] = useState("No API key validated yet.");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [windowPos, setWindowPos] = useState({ x: 120, y: 120 });
@@ -833,6 +835,38 @@ function App() {
 
   function getWindowZ(windowId) {
     return 30 + windowStack.indexOf(windowId);
+  }
+
+  async function pingGeminiStatus(apiKey) {
+    if (!apiKey) {
+      setGeminiStatus("inactive");
+      setGeminiStatusMessage("No API key validated yet.");
+      return;
+    }
+
+    setGeminiStatus("checking");
+    setGeminiStatusMessage("Pinging Gemini...");
+
+    try {
+      const response = await fetch("/api/validate-gemini-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey }),
+      });
+
+      const payload = await response.json();
+      if (response.ok && payload?.ok) {
+        setGeminiStatus("active");
+        setGeminiStatusMessage(payload.message || "Connected to Gemini API.");
+        return;
+      }
+
+      setGeminiStatus("inactive");
+      setGeminiStatusMessage(payload?.message || "Could not validate the Gemini key.");
+    } catch {
+      setGeminiStatus("inactive");
+      setGeminiStatusMessage("Network error while checking Gemini status.");
+    }
   }
 
   useEffect(() => {
@@ -1172,6 +1206,7 @@ function App() {
     setDogCustomMessage("");
     setGeminiApiKey(trimmed);
     setGeminiOpen(false);
+    void pingGeminiStatus(trimmed);
   }
 
   function openPinball() {
@@ -1534,8 +1569,42 @@ function App() {
     setStartMenuOpen(false);
   }
 
+  function onDesktopGeminiRefresh(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    void pingGeminiStatus(geminiApiKey.trim());
+  }
+
   return (
     <main ref={desktopRef} className="desktop">
+      <section
+        className="desktop-gemini-status"
+        onContextMenu={onDesktopGeminiRefresh}
+        aria-label="Gemini connection status"
+      >
+        <span className={`gemini-status-chip gemini-status-chip--${geminiStatus}`} aria-live="polite">
+          <span className="gemini-status-robot" aria-hidden="true">🤖</span>
+          <span>
+            {geminiStatus === "active"
+              ? "Active"
+              : geminiStatus === "checking"
+                ? "Checking"
+                : "Inactive"}
+          </span>
+        </span>
+        <button
+          className="gemini-refresh-btn"
+          type="button"
+          aria-label="Refresh Gemini status"
+          title="Refresh Gemini status"
+          onClick={onDesktopGeminiRefresh}
+        >
+          ↻
+        </button>
+      </section>
+
       {icons.map((icon) => (
         <div
           key={icon.id}
@@ -1815,7 +1884,8 @@ function App() {
               </button>
             </div>
             <div className="gemini-status">
-              Current session key: {geminiApiKey || "(none)"}
+              <div>Connection: {geminiStatusMessage}</div>
+              <div>Current session key: {geminiApiKey || "(none)"}</div>
             </div>
           </div>
         </section>

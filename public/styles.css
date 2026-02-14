@@ -138,6 +138,21 @@ body,
   gap: 10px;
 }
 
+.desktop-gemini-status {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 58;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid rgba(9, 42, 88, 0.65);
+  border-radius: 9999px;
+  background: linear-gradient(180deg, rgba(227, 241, 255, 0.94), rgba(183, 212, 247, 0.92));
+  box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.3);
+}
+
 .xp-dog-btn {
   border: 0;
   background: transparent;
@@ -784,6 +799,60 @@ body,
   margin-top: 10px;
   display: flex;
   gap: 8px;
+}
+
+.gemini-status-chip {
+  height: 20px;
+  border-radius: 9999px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  text-shadow: none;
+  background: #e3e8ef;
+  color: #29405f;
+}
+
+.gemini-status-chip--active {
+  background: #d7f4dd;
+  border-color: #88c795;
+  color: #1b5f2a;
+}
+
+.gemini-status-chip--inactive {
+  background: #f7d8d6;
+  border-color: #c98c86;
+  color: #6c2620;
+}
+
+.gemini-status-chip--checking {
+  background: #f6ebcc;
+  border-color: #ceb071;
+  color: #6e4a0f;
+}
+
+.gemini-status-robot {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.gemini-refresh-btn {
+  width: 22px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 1px solid #2f5fa0;
+  background: linear-gradient(180deg, #f4fbff, #b9d7ff);
+  color: #123866;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gemini-refresh-btn:hover {
+  background: linear-gradient(180deg, #ffffff, #cce2ff);
 }
 
 .gemini-status {
