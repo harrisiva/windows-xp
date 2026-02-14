@@ -730,6 +730,7 @@ function App() {
   const [notepadSize, setNotepadSize] = useState({ width: 620, height: 440 });
   const [pinballPos, setPinballPos] = useState({ x: 200, y: 86 });
   const [pinballSize, setPinballSize] = useState({ width: 610, height: 500 });
+  const [tetrisPos, setTetrisPos] = useState({ x: 260, y: 96 });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [windowPos, setWindowPos] = useState({ x: 120, y: 120 });
@@ -740,6 +741,7 @@ function App() {
   const explorerRef = useRef(null);
   const notepadRef = useRef(null);
   const pinballRef = useRef(null);
+  const tetrisRef = useRef(null);
 
   useEffect(() => {
     function closeMenu() {
@@ -874,6 +876,17 @@ function App() {
       };
     }
 
+    function clampTetrisToViewport(x, y, width, height) {
+      const margin = 12;
+      const tWidth = width || tetrisRef.current?.offsetWidth || 360;
+      const tHeight = height || tetrisRef.current?.offsetHeight || 520;
+      const maxY = Math.max(margin, window.innerHeight - TASKBAR_HEIGHT - tHeight - margin);
+      return {
+        x: Math.min(Math.max(margin, x), Math.max(margin, window.innerWidth - tWidth - margin)),
+        y: Math.min(Math.max(margin, y), maxY),
+      };
+    }
+
     function clampIconToDesktop(x, y) {
       const desktop = desktopRef.current;
       if (!desktop) {
@@ -916,6 +929,12 @@ function App() {
         const nextX = event.clientX - dragState.current.offsetX;
         const nextY = event.clientY - dragState.current.offsetY;
         setPinballPos(clampPinballToViewport(nextX, nextY));
+      }
+
+      if (dragState.current.target === "tetris-window") {
+        const nextX = event.clientX - dragState.current.offsetX;
+        const nextY = event.clientY - dragState.current.offsetY;
+        setTetrisPos(clampTetrisToViewport(nextX, nextY));
       }
 
       if (dragState.current.target === "explorer-resize") {
@@ -975,6 +994,7 @@ function App() {
       setNotepadPos((prev) => clampNotepadToViewport(prev.x, prev.y));
       setPinballSize((prev) => clampPinballSizeToViewport(prev.width, prev.height));
       setPinballPos((prev) => clampPinballToViewport(prev.x, prev.y));
+      setTetrisPos((prev) => clampTetrisToViewport(prev.x, prev.y));
     }
 
     window.addEventListener("pointermove", onPointerMove);
@@ -1195,6 +1215,29 @@ function App() {
       startY: event.clientY,
       startWidth: pinballSize.width,
       startHeight: pinballSize.height,
+    };
+    document.body.classList.add("is-dragging");
+  }
+
+  function onTetrisHeaderPointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (event.target.closest("button")) {
+      return;
+    }
+
+    const rect = tetrisRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    dragState.current = {
+      target: "tetris-window",
+      id: null,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
     };
     document.body.classList.add("is-dragging");
   }
@@ -1571,8 +1614,14 @@ function App() {
       )}
 
       {tetrisOpen && (
-        <section className="tetris-window" role="dialog" aria-label="Tetris">
-          <div className="window-header">
+        <section
+          ref={tetrisRef}
+          className="tetris-window"
+          style={{ left: tetrisPos.x, top: tetrisPos.y }}
+          role="dialog"
+          aria-label="Tetris"
+        >
+          <div className="window-header" onPointerDown={onTetrisHeaderPointerDown}>
             <span className="window-title">Tetris</span>
             <button className="close-btn" onClick={closeTetris} aria-label="Close Tetris">
               ×
