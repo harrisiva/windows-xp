@@ -202,7 +202,7 @@ body,
   display: flex;
   flex-direction: column;
   padding: 8px;
-  background: linear-gradient(180deg, #d7e8ff 0%, #bed7fa 100%);
+  background: linear-gradient(180deg, #d0e2ff 0%, #aec9ef 100%);
 }
 
 .pinball-toolbar {
@@ -217,6 +217,7 @@ body,
   color: #1c2f50;
   font-size: 12px;
   font-weight: 700;
+  font-family: "Lucida Console", "Courier New", monospace;
 }
 
 .pinball-launch-btn {
@@ -232,10 +233,10 @@ body,
 
 .pinball-canvas {
   display: block;
-  width: min(100%, calc((100vh - 220px) * 1.55));
+  width: 100%;
   height: auto;
   margin: 0 auto;
-  border: 1px solid #2e5080;
+  border: 1px solid #2a4d7a;
   background: #103a76;
 }
 

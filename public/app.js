@@ -11,8 +11,8 @@ function PinballGame({ isOpen }) {
 
   function resetBall(state) {
     state.ball = {
-      x: 525,
-      y: 332,
+      x: state.table.w - 38,
+      y: state.table.h - 72,
       vx: 0,
       vy: 0,
       r: 8,
@@ -22,15 +22,27 @@ function PinballGame({ isOpen }) {
 
   function resetGame() {
     const next = {
-      table: { w: 560, h: 360 },
+      table: { w: 620, h: 420 },
       ball: null,
+      stars: Array.from({ length: 24 }, () => ({
+        x: Math.random() * 520 + 24,
+        y: Math.random() * 240 + 24,
+        r: Math.random() * 1.4 + 0.4,
+      })),
       bumpers: [
-        { x: 178, y: 118, r: 20, points: 50 },
-        { x: 284, y: 156, r: 24, points: 75 },
-        { x: 392, y: 112, r: 20, points: 50 },
+        { x: 168, y: 110, r: 22, points: 100, cool: 0 },
+        { x: 286, y: 152, r: 24, points: 150, cool: 0 },
+        { x: 414, y: 110, r: 22, points: 100, cool: 0 },
       ],
-      leftPaddle: { x: 136, y: 320, w: 96, h: 14 },
-      rightPaddle: { x: 328, y: 320, w: 96, h: 14 },
+      targets: [
+        { x: 108, y: 188, w: 18, h: 30, points: 250, hit: 0 },
+        { x: 132, y: 208, w: 18, h: 30, points: 250, hit: 0 },
+        { x: 156, y: 228, w: 18, h: 30, points: 250, hit: 0 },
+      ],
+      leftPaddle: { x: 154, y: 362, w: 108, h: 14 },
+      rightPaddle: { x: 346, y: 362, w: 108, h: 14 },
+      leftSling: { x: 116, y: 316, w: 52, h: 44 },
+      rightSling: { x: 454, y: 316, w: 52, h: 44 },
     };
     resetBall(next);
     gameRef.current = next;
@@ -45,8 +57,8 @@ function PinballGame({ isOpen }) {
       return;
     }
     state.ball.launched = true;
-    state.ball.vx = -4.6 - Math.random() * 1.6;
-    state.ball.vy = -10.8;
+    state.ball.vx = -5.2 - Math.random() * 1.4;
+    state.ball.vy = -12.8;
     setStatus("Use \u2190 and \u2192 to control flippers");
   }
 
@@ -97,37 +109,61 @@ function PinballGame({ isOpen }) {
       };
     }
 
+    function collidePaddle(ball, paddleX, paddleY, width, isLeft) {
+      const paddleTop = paddleY;
+      const paddleBottom = paddleY + 14;
+      if (
+        ball.y + ball.r >= paddleTop &&
+        ball.y - ball.r <= paddleBottom &&
+        ball.x >= paddleX &&
+        ball.x <= paddleX + width &&
+        ball.vy > 0
+      ) {
+        ball.y = paddleTop - ball.r - 0.5;
+        const hitPos = (ball.x - (paddleX + width / 2)) / (width / 2);
+        const push = isLeft ? -0.9 : 0.9;
+        ball.vx = ball.vx * 0.52 + hitPos * 5.2 + push;
+        ball.vy = -Math.abs(ball.vy) * 0.94 - 1.5;
+        setScore((prev) => prev + 25);
+      }
+    }
+
     function animate() {
       const state = gameRef.current;
       if (!state) {
         return;
       }
 
-      const { table, ball, bumpers, leftPaddle, rightPaddle } = state;
-      const activeLeftY = keysRef.current.left ? 304 : 320;
-      const activeRightY = keysRef.current.right ? 304 : 320;
+      const { table, ball, stars, bumpers, leftPaddle, rightPaddle, leftSling, rightSling, targets } = state;
+      const activeLeftY = keysRef.current.left ? 348 : 362;
+      const activeRightY = keysRef.current.right ? 348 : 362;
 
       if (ball.launched) {
-        ball.vy += 0.19;
+        ball.vy += 0.2;
       }
 
+      ball.vx *= 0.999;
+      ball.vy *= 0.999;
       ball.x += ball.vx;
       ball.y += ball.vy;
 
-      if (ball.x - ball.r <= 10) {
-        ball.x = 10 + ball.r;
-        ball.vx = Math.abs(ball.vx) * 0.98;
+      if (ball.x - ball.r <= 14) {
+        ball.x = 14 + ball.r;
+        ball.vx = Math.abs(ball.vx) * 0.96;
       }
-      if (ball.x + ball.r >= table.w - 10) {
-        ball.x = table.w - 10 - ball.r;
-        ball.vx = -Math.abs(ball.vx) * 0.98;
+      if (ball.x + ball.r >= table.w - 14) {
+        ball.x = table.w - 14 - ball.r;
+        ball.vx = -Math.abs(ball.vx) * 0.96;
       }
-      if (ball.y - ball.r <= 10) {
-        ball.y = 10 + ball.r;
-        ball.vy = Math.abs(ball.vy) * 0.98;
+      if (ball.y - ball.r <= 14) {
+        ball.y = 14 + ball.r;
+        ball.vy = Math.abs(ball.vy) * 0.97;
       }
 
       bumpers.forEach((bumper) => {
+        if (bumper.cool > 0) {
+          bumper.cool -= 1;
+        }
         const dx = ball.x - bumper.x;
         const dy = ball.y - bumper.y;
         const distance = Math.hypot(dx, dy);
@@ -138,35 +174,54 @@ function PinballGame({ isOpen }) {
           ball.x += nx * overlap;
           ball.y += ny * overlap;
           const reflected = reflect(ball.vx, ball.vy, nx, ny);
-          ball.vx = reflected.x * 1.05;
-          ball.vy = reflected.y * 1.05;
-          setScore((prev) => prev + bumper.points);
+          ball.vx = reflected.x * 1.08;
+          ball.vy = reflected.y * 1.08;
+          if (bumper.cool === 0) {
+            setScore((prev) => prev + bumper.points);
+            bumper.cool = 8;
+          }
         }
       });
 
-      function paddleBounce(paddleX, paddleY, width, isLeft) {
-        const paddleTop = paddleY;
-        const paddleBottom = paddleY + 14;
+      targets.forEach((target) => {
+        if (target.hit > 0) {
+          target.hit -= 1;
+        }
         if (
-          ball.y + ball.r >= paddleTop &&
-          ball.y - ball.r <= paddleBottom &&
-          ball.x >= paddleX &&
-          ball.x <= paddleX + width &&
-          ball.vy > 0
+          ball.x + ball.r > target.x &&
+          ball.x - ball.r < target.x + target.w &&
+          ball.y + ball.r > target.y &&
+          ball.y - ball.r < target.y + target.h
         ) {
-          ball.y = paddleTop - ball.r - 0.5;
-          const hitPos = (ball.x - (paddleX + width / 2)) / (width / 2);
-          const push = isLeft ? -0.8 : 0.8;
-          ball.vx = ball.vx * 0.55 + hitPos * 4.8 + push;
-          ball.vy = -Math.abs(ball.vy) * 0.92 - 1.1;
-          setScore((prev) => prev + 10);
+          ball.vx *= -0.94;
+          ball.vy *= 0.92;
+          if (target.hit === 0) {
+            target.hit = 12;
+            setScore((prev) => prev + target.points);
+          }
+        }
+      });
+
+      function slingBounce(sling, dir) {
+        if (
+          ball.x + ball.r > sling.x &&
+          ball.x - ball.r < sling.x + sling.w &&
+          ball.y + ball.r > sling.y &&
+          ball.y - ball.r < sling.y + sling.h &&
+          ball.vy > -1
+        ) {
+          ball.vx += dir * 1.6;
+          ball.vy = -Math.abs(ball.vy) - 1.8;
+          setScore((prev) => prev + 40);
         }
       }
 
-      paddleBounce(leftPaddle.x, activeLeftY, leftPaddle.w, true);
-      paddleBounce(rightPaddle.x, activeRightY, rightPaddle.w, false);
+      slingBounce(leftSling, -1);
+      slingBounce(rightSling, 1);
+      collidePaddle(ball, leftPaddle.x, activeLeftY, leftPaddle.w, true);
+      collidePaddle(ball, rightPaddle.x, activeRightY, rightPaddle.w, false);
 
-      if (ball.y - ball.r > table.h + 24) {
+      if (ball.y - ball.r > table.h + 30) {
         setLives((prev) => {
           const nextLives = prev - 1;
           if (nextLives <= 0) {
@@ -181,42 +236,113 @@ function PinballGame({ isOpen }) {
       }
 
       ctx.clearRect(0, 0, table.w, table.h);
-      const bg = ctx.createLinearGradient(0, 0, 0, table.h);
-      bg.addColorStop(0, "#112f68");
-      bg.addColorStop(0.6, "#1f5fb6");
-      bg.addColorStop(1, "#2663b4");
-      ctx.fillStyle = bg;
+      const frame = ctx.createLinearGradient(0, 0, 0, table.h);
+      frame.addColorStop(0, "#0a2f72");
+      frame.addColorStop(1, "#031430");
+      ctx.fillStyle = frame;
       ctx.fillRect(0, 0, table.w, table.h);
 
-      ctx.fillStyle = "#0a2d63";
-      ctx.fillRect(10, 10, table.w - 20, table.h - 20);
+      const playfield = ctx.createLinearGradient(0, 0, table.w, table.h);
+      playfield.addColorStop(0, "#123771");
+      playfield.addColorStop(0.58, "#234ea1");
+      playfield.addColorStop(1, "#16386f");
+      ctx.fillStyle = playfield;
+      ctx.fillRect(14, 14, table.w - 28, table.h - 28);
 
-      const lane = ctx.createLinearGradient(table.w - 68, 14, table.w - 14, table.h - 14);
-      lane.addColorStop(0, "#2d88e3");
-      lane.addColorStop(1, "#0c3f86");
+      ctx.strokeStyle = "rgba(170, 220, 255, 0.35)";
+      ctx.lineWidth = 1;
+      stars.forEach((star) => {
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      ctx.strokeStyle = "#6cb8ff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(80, 36);
+      ctx.quadraticCurveTo(180, 96, 260, 76);
+      ctx.quadraticCurveTo(340, 56, 446, 120);
+      ctx.stroke();
+
+      const lane = ctx.createLinearGradient(table.w - 78, 20, table.w - 20, table.h - 20);
+      lane.addColorStop(0, "#41a9ff");
+      lane.addColorStop(1, "#134b97");
       ctx.fillStyle = lane;
-      ctx.fillRect(table.w - 64, 14, 50, table.h - 28);
+      ctx.fillRect(table.w - 74, 20, 54, table.h - 40);
+
+      targets.forEach((target) => {
+        ctx.fillStyle = target.hit ? "#fff59b" : "#bde3ff";
+        ctx.fillRect(target.x, target.y, target.w, target.h);
+        ctx.strokeStyle = "#3d6ea4";
+        ctx.strokeRect(target.x, target.y, target.w, target.h);
+      });
+
+      function drawSling(sling, isLeft) {
+        ctx.beginPath();
+        if (isLeft) {
+          ctx.moveTo(sling.x, sling.y + sling.h);
+          ctx.lineTo(sling.x + sling.w, sling.y + sling.h);
+          ctx.lineTo(sling.x + sling.w, sling.y);
+        } else {
+          ctx.moveTo(sling.x, sling.y);
+          ctx.lineTo(sling.x, sling.y + sling.h);
+          ctx.lineTo(sling.x + sling.w, sling.y + sling.h);
+        }
+        ctx.closePath();
+        const slingGrad = ctx.createLinearGradient(sling.x, sling.y, sling.x + sling.w, sling.y + sling.h);
+        slingGrad.addColorStop(0, "#ffce83");
+        slingGrad.addColorStop(1, "#d95429");
+        ctx.fillStyle = slingGrad;
+        ctx.fill();
+        ctx.strokeStyle = "#7c2717";
+        ctx.stroke();
+      }
+
+      drawSling(leftSling, true);
+      drawSling(rightSling, false);
 
       bumpers.forEach((bumper) => {
-        const glow = ctx.createRadialGradient(bumper.x, bumper.y, 4, bumper.x, bumper.y, bumper.r);
-        glow.addColorStop(0, "#fff3ad");
-        glow.addColorStop(0.5, "#f89a42");
-        glow.addColorStop(1, "#9f2b0d");
+        const glow = ctx.createRadialGradient(
+          bumper.x,
+          bumper.y,
+          2,
+          bumper.x,
+          bumper.y,
+          bumper.r + (bumper.cool ? 4 : 0)
+        );
+        glow.addColorStop(0, "#fff9c8");
+        glow.addColorStop(0.5, "#ffad4a");
+        glow.addColorStop(1, "#8d2b0a");
         ctx.fillStyle = glow;
         ctx.beginPath();
         ctx.arc(bumper.x, bumper.y, bumper.r, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = "#4a1e11";
+        ctx.lineWidth = 2;
+        ctx.stroke();
       });
 
-      ctx.fillStyle = "#e7f5ff";
-      ctx.strokeStyle = "#335985";
+      ctx.fillStyle = "#e8f6ff";
+      ctx.strokeStyle = "#355f8f";
       ctx.lineWidth = 2;
       ctx.fillRect(leftPaddle.x, activeLeftY, leftPaddle.w, leftPaddle.h);
       ctx.strokeRect(leftPaddle.x, activeLeftY, leftPaddle.w, leftPaddle.h);
       ctx.fillRect(rightPaddle.x, activeRightY, rightPaddle.w, rightPaddle.h);
       ctx.strokeRect(rightPaddle.x, activeRightY, rightPaddle.w, rightPaddle.h);
 
-      ctx.fillStyle = "#f6fbff";
+      const ballGrad = ctx.createRadialGradient(
+        ball.x - 3,
+        ball.y - 4,
+        1,
+        ball.x,
+        ball.y,
+        ball.r
+      );
+      ballGrad.addColorStop(0, "#ffffff");
+      ballGrad.addColorStop(0.55, "#dde8f8");
+      ballGrad.addColorStop(1, "#8798b3");
+      ctx.fillStyle = ballGrad;
       ctx.beginPath();
       ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
       ctx.fill();
@@ -238,13 +364,13 @@ function PinballGame({ isOpen }) {
   return (
     <div className="pinball-game">
       <div className="pinball-toolbar">
-        <span>Score: {score}</span>
+        <span>Score: {String(score).padStart(7, "0")}</span>
         <span>Lives: {lives}</span>
         <button type="button" className="pinball-launch-btn" onClick={launchBall}>
           Launch
         </button>
       </div>
-      <canvas ref={canvasRef} className="pinball-canvas" width={560} height={360} />
+      <canvas ref={canvasRef} className="pinball-canvas" width={620} height={420} />
       <div className="pinball-status">{status}</div>
     </div>
   );
