@@ -177,6 +177,16 @@ body,
   z-index: 35;
 }
 
+.notepad-window {
+  position: fixed;
+  border: 1px solid #083c84;
+  border-radius: 7px;
+  background: #ffffff;
+  box-shadow: 0 11px 24px rgba(0, 0, 0, 0.52);
+  overflow: hidden;
+  z-index: 36;
+}
+
 .window-header {
   display: flex;
   justify-content: space-between;
@@ -211,6 +221,54 @@ body,
   background: linear-gradient(180deg, #ff9b96, #df4039);
 }
 
+.notepad-toolbar {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 9px;
+  border-bottom: 1px solid #becfe6;
+  background: #f8fbff;
+  font-size: 12px;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.notepad-body {
+  height: calc(100% - 60px);
+  background: #ffffff;
+  padding: 4px;
+}
+
+.notepad-editor {
+  width: 100%;
+  height: 100%;
+  border: 1px solid #9eb6d2;
+  background: #ffffff;
+  color: #101010;
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 8px;
+  resize: none;
+  outline: none;
+}
+
+.notepad-resize-handle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background:
+    linear-gradient(135deg, transparent 0 45%, #7f9fc7 45% 56%, transparent 56% 100%),
+    linear-gradient(135deg, transparent 0 60%, #7f9fc7 60% 68%, transparent 68% 100%),
+    linear-gradient(135deg, transparent 0 74%, #7f9fc7 74% 82%, transparent 82% 100%);
+}
+
 .window-body {
   padding: 13px 14px 15px;
   height: calc(100% - 34px);
@@ -231,13 +289,25 @@ body,
 }
 
 .toolbar-btn {
-  padding: 2px 5px;
+  padding: 2px 7px;
   border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #1c2c44;
+  font: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
 }
 
 .toolbar-btn:hover {
   border-color: #8fb2de;
   background: #e8f2ff;
+}
+
+.toolbar-btn:active {
+  background: #d6e9ff;
+  border-color: #6f97cb;
 }
 
 .explorer-body {

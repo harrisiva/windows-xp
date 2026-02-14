@@ -4,6 +4,7 @@ const DEFAULT_ICONS = [
   { id: "computer", label: "My Computer", type: "computer" },
   { id: "recycle", label: "Recycle Bin", type: "recycle-shortcut" },
   { id: "cmd", label: "Command Prompt", type: "cmd-shortcut" },
+  { id: "readme", label: "readme.txt", type: "text-file" },
 ];
 
 function App() {
@@ -15,8 +16,15 @@ function App() {
   const [menu, setMenu] = useState({ visible: false, x: 0, y: 0, targetId: null });
   const [siteInfo, setSiteInfo] = useState(null);
   const [explorerOpen, setExplorerOpen] = useState(false);
+  const [notepadOpen, setNotepadOpen] = useState(false);
+  const [readmeContent, setReadmeContent] = useState(
+    "Welcome to this Windows XP desktop web app.\n\nYou can edit this file. Changes stay until you refresh the page."
+  );
+  const [readmeFontSize, setReadmeFontSize] = useState(13);
   const [explorerPos, setExplorerPos] = useState({ x: 160, y: 78 });
   const [explorerSize, setExplorerSize] = useState({ width: 640, height: 430 });
+  const [notepadPos, setNotepadPos] = useState({ x: 220, y: 110 });
+  const [notepadSize, setNotepadSize] = useState({ width: 620, height: 440 });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [windowPos, setWindowPos] = useState({ x: 120, y: 120 });
@@ -25,6 +33,7 @@ function App() {
   const desktopRef = useRef(null);
   const windowRef = useRef(null);
   const explorerRef = useRef(null);
+  const notepadRef = useRef(null);
 
   useEffect(() => {
     function closeMenu() {
@@ -101,6 +110,32 @@ function App() {
       };
     }
 
+    function clampNotepadToViewport(x, y, width, height) {
+      const margin = 12;
+      const notepadWidth = width || notepadRef.current?.offsetWidth || 620;
+      const notepadHeight = height || notepadRef.current?.offsetHeight || 440;
+      const maxY = Math.max(margin, window.innerHeight - TASKBAR_HEIGHT - notepadHeight - margin);
+      return {
+        x: Math.min(Math.max(margin, x), Math.max(margin, window.innerWidth - notepadWidth - margin)),
+        y: Math.min(Math.max(margin, y), maxY),
+      };
+    }
+
+    function clampNotepadSizeToViewport(width, height, x, y) {
+      const margin = 12;
+      const minWidth = 420;
+      const minHeight = 260;
+      const notepadRect = notepadRef.current?.getBoundingClientRect();
+      const left = x ?? notepadRect?.left ?? 220;
+      const top = y ?? notepadRect?.top ?? 110;
+      const maxWidth = Math.max(minWidth, window.innerWidth - left - margin);
+      const maxHeight = Math.max(minHeight, window.innerHeight - TASKBAR_HEIGHT - top - margin);
+      return {
+        width: Math.min(Math.max(minWidth, width), maxWidth),
+        height: Math.min(Math.max(minHeight, height), maxHeight),
+      };
+    }
+
     function clampIconToDesktop(x, y) {
       const desktop = desktopRef.current;
       if (!desktop) {
@@ -133,12 +168,26 @@ function App() {
         setExplorerPos(clampExplorerToViewport(nextX, nextY));
       }
 
+      if (dragState.current.target === "notepad-window") {
+        const nextX = event.clientX - dragState.current.offsetX;
+        const nextY = event.clientY - dragState.current.offsetY;
+        setNotepadPos(clampNotepadToViewport(nextX, nextY));
+      }
+
       if (dragState.current.target === "explorer-resize") {
         const deltaX = event.clientX - dragState.current.startX;
         const deltaY = event.clientY - dragState.current.startY;
         const nextWidth = dragState.current.startWidth + deltaX;
         const nextHeight = dragState.current.startHeight + deltaY;
         setExplorerSize(clampExplorerSizeToViewport(nextWidth, nextHeight));
+      }
+
+      if (dragState.current.target === "notepad-resize") {
+        const deltaX = event.clientX - dragState.current.startX;
+        const deltaY = event.clientY - dragState.current.startY;
+        const nextWidth = dragState.current.startWidth + deltaX;
+        const nextHeight = dragState.current.startHeight + deltaY;
+        setNotepadSize(clampNotepadSizeToViewport(nextWidth, nextHeight));
       }
 
       if (dragState.current.target === "icon") {
@@ -170,6 +219,8 @@ function App() {
       setWindowPos((prev) => clampToViewport(prev.x, prev.y));
       setExplorerSize((prev) => clampExplorerSizeToViewport(prev.width, prev.height));
       setExplorerPos((prev) => clampExplorerToViewport(prev.x, prev.y));
+      setNotepadSize((prev) => clampNotepadSizeToViewport(prev.width, prev.height));
+      setNotepadPos((prev) => clampNotepadToViewport(prev.x, prev.y));
     }
 
     window.addEventListener("pointermove", onPointerMove);
@@ -217,6 +268,18 @@ function App() {
 
   function closeExplorer() {
     setExplorerOpen(false);
+  }
+
+  function openReadme() {
+    setNotepadOpen(true);
+  }
+
+  function closeReadme() {
+    setNotepadOpen(false);
+  }
+
+  function changeReadmeFontSize(delta) {
+    setReadmeFontSize((prev) => Math.min(28, Math.max(10, prev + delta)));
   }
 
   function onDeleteIconClick() {
@@ -286,6 +349,45 @@ function App() {
     document.body.classList.add("is-dragging");
   }
 
+  function onNotepadResizePointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    dragState.current = {
+      target: "notepad-resize",
+      id: null,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: notepadSize.width,
+      startHeight: notepadSize.height,
+    };
+    document.body.classList.add("is-dragging");
+  }
+
+  function onNotepadHeaderPointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (event.target.closest("button")) {
+      return;
+    }
+
+    const rect = notepadRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    dragState.current = {
+      target: "notepad-window",
+      id: null,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    document.body.classList.add("is-dragging");
+  }
+
   function onIconPointerDown(event, iconId) {
     if (event.button !== 0) {
       return;
@@ -345,6 +447,18 @@ function App() {
       );
     }
 
+    if (type === "text-file") {
+      return (
+        <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M16 7h30l9 9v41H16z" fill="#ffffff" stroke="#738ba8" strokeWidth="2" />
+          <path d="M46 7v9h9" fill="#e0ecfb" />
+          <rect x="20" y="13" width="22" height="6" rx="1.5" fill="#4f87cd" />
+          <path d="M22 27h26M22 33h26M22 39h21" stroke="#3b6fa9" strokeWidth="2" />
+          <rect x="18" y="46" width="35" height="2" fill="#d7e4f5" />
+        </svg>
+      );
+    }
+
     return (
       <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">
         <rect x="8" y="8" width="48" height="48" rx="6" fill="#d5e6ff" stroke="#3b6aa8" strokeWidth="2" />
@@ -361,8 +475,14 @@ function App() {
           className={`icon ${icon.type.endsWith("shortcut") ? "icon--shortcut" : ""}`}
           style={{ left: icon.x, top: icon.y }}
           onPointerDown={(event) => onIconPointerDown(event, icon.id)}
-          onDoubleClick={icon.id === "computer" ? openExplorer : undefined}
-          onContextMenu={(event) => onIconRightClick(event, icon.id)}
+          onDoubleClick={
+            icon.id === "computer" ? openExplorer : icon.id === "readme" ? openReadme : undefined
+          }
+          onContextMenu={
+            icon.id === "computer" || icon.id === "recycle" || icon.id === "cmd"
+              ? (event) => onIconRightClick(event, icon.id)
+              : undefined
+          }
           aria-label={`${icon.label} icon`}
         >
           <div className="icon-image" title={icon.label}>
@@ -452,11 +572,11 @@ function App() {
             </button>
           </div>
           <div className="explorer-toolbar">
-            <span className="toolbar-btn">File</span>
-            <span className="toolbar-btn">Edit</span>
-            <span className="toolbar-btn">View</span>
-            <span className="toolbar-btn">Tools</span>
-            <span className="toolbar-btn">Help</span>
+            <button className="toolbar-btn" type="button">File</button>
+            <button className="toolbar-btn" type="button">Edit</button>
+            <button className="toolbar-btn" type="button">View</button>
+            <button className="toolbar-btn" type="button">Tools</button>
+            <button className="toolbar-btn" type="button">Help</button>
           </div>
           <div className="explorer-body">
             <aside className="explorer-sidebar">
@@ -473,6 +593,52 @@ function App() {
           <div
             className="explorer-resize-handle"
             onPointerDown={onExplorerResizePointerDown}
+            aria-hidden="true"
+          />
+        </section>
+      )}
+
+      {notepadOpen && (
+        <section
+          ref={notepadRef}
+          className="notepad-window"
+          style={{
+            left: notepadPos.x,
+            top: notepadPos.y,
+            width: notepadSize.width,
+            height: notepadSize.height,
+          }}
+          role="dialog"
+          aria-label="Notepad"
+        >
+          <div className="window-header" onPointerDown={onNotepadHeaderPointerDown}>
+            <span className="window-title">readme.txt - Notepad</span>
+            <button className="close-btn" onClick={closeReadme} aria-label="Close Notepad">
+              ×
+            </button>
+          </div>
+          <div className="notepad-toolbar">
+            <button className="toolbar-btn" type="button">File</button>
+            <button className="toolbar-btn" type="button">Edit</button>
+            <button className="toolbar-btn" type="button">Format</button>
+            <button className="toolbar-btn" type="button">View</button>
+            <button className="toolbar-btn" type="button">Help</button>
+            <span className="toolbar-spacer" />
+            <button className="toolbar-btn" type="button" onClick={() => changeReadmeFontSize(-1)}>A-</button>
+            <button className="toolbar-btn" type="button" onClick={() => changeReadmeFontSize(1)}>A+</button>
+          </div>
+          <div className="notepad-body">
+            <textarea
+              className="notepad-editor"
+              value={readmeContent}
+              onChange={(event) => setReadmeContent(event.target.value)}
+              style={{ fontSize: `${readmeFontSize}px` }}
+              spellCheck={false}
+            />
+          </div>
+          <div
+            className="notepad-resize-handle"
+            onPointerDown={onNotepadResizePointerDown}
             aria-hidden="true"
           />
         </section>
