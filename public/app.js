@@ -14,6 +14,7 @@ function App() {
   const ICON_GAP = 14;
   const DESKTOP_PADDING = 12;
   const [menu, setMenu] = useState({ visible: false, x: 0, y: 0, targetId: null });
+  const [startMenuOpen, setStartMenuOpen] = useState(false);
   const [siteInfo, setSiteInfo] = useState(null);
   const [explorerOpen, setExplorerOpen] = useState(false);
   const [notepadOpen, setNotepadOpen] = useState(false);
@@ -38,11 +39,17 @@ function App() {
   useEffect(() => {
     function closeMenu() {
       setMenu((prev) => ({ ...prev, visible: false, targetId: null }));
+      setStartMenuOpen(false);
     }
 
     window.addEventListener("click", closeMenu);
     return () => window.removeEventListener("click", closeMenu);
   }, []);
+
+  function onStartButtonClick(event) {
+    event.stopPropagation();
+    setStartMenuOpen((prev) => !prev);
+  }
 
   useEffect(() => {
     function arrangeIcons(iconItems) {
@@ -644,8 +651,65 @@ function App() {
         </section>
       )}
 
+      {startMenuOpen && (
+        <section className="start-menu" role="dialog" aria-label="Start menu" onClick={(event) => event.stopPropagation()}>
+          <div className="start-menu-top">
+            <div className="start-avatar" />
+            <div className="start-user">harri</div>
+          </div>
+          <div className="start-menu-body">
+            <div className="start-left">
+              <button className="start-item" type="button">
+                Internet
+              </button>
+              <button className="start-item" type="button">
+                E-mail
+              </button>
+              <hr className="start-divider" />
+              <button className="start-item" type="button">
+                My Documents
+              </button>
+              <button className="start-item" type="button">
+                My Pictures
+              </button>
+              <button className="start-item" type="button">
+                My Music
+              </button>
+              <button className="start-item" type="button">
+                My Recent Documents
+              </button>
+            </div>
+            <div className="start-right">
+              <button className="start-link" type="button">
+                My Computer
+              </button>
+              <button className="start-link" type="button">
+                Control Panel
+              </button>
+              <button className="start-link" type="button">
+                Printers and Faxes
+              </button>
+              <button className="start-link" type="button">
+                Help and Support
+              </button>
+              <button className="start-link" type="button">
+                Search
+              </button>
+              <button className="start-link" type="button">
+                Run...
+              </button>
+            </div>
+          </div>
+          <div className="start-menu-bottom">
+            <button className="start-power" type="button">
+              Turn Off Computer
+            </button>
+          </div>
+        </section>
+      )}
+
       <footer className="taskbar" aria-hidden="true">
-        <button className="start-button" type="button">
+        <button className="start-button" type="button" onClick={onStartButtonClick}>
           <span className="start-orb">
             <span className="orb-red" />
             <span className="orb-green" />
