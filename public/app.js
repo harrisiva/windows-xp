@@ -1,6 +1,6 @@
 const { useEffect, useRef, useState } = React;
 
-function PinballGame({ isOpen, onFitWindow }) {
+function PinballGame({ isOpen }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(0);
   const keysRef = useRef({ left: false, right: false });
@@ -240,9 +240,6 @@ function PinballGame({ isOpen, onFitWindow }) {
       <div className="pinball-toolbar">
         <span>Score: {score}</span>
         <span>Lives: {lives}</span>
-        <button type="button" className="pinball-launch-btn" onClick={onFitWindow}>
-          Fit to Window
-        </button>
         <button type="button" className="pinball-launch-btn" onClick={launchBall}>
           Launch
         </button>
@@ -744,13 +741,11 @@ function App() {
   }
 
   function fitPinballToWindow() {
-    const margin = 12;
-    const maxWidth = window.innerWidth - margin * 2;
-    const maxHeight = window.innerHeight - TASKBAR_HEIGHT - margin * 2;
-    const width = Math.max(460, Math.min(maxWidth, Math.floor(maxHeight * (560 / 360))));
-    const height = Math.max(360, Math.min(maxHeight, Math.floor(width * (360 / 560)) + 78));
-    setPinballPos({ x: margin, y: margin });
-    setPinballSize({ width, height });
+    setPinballPos({ x: 0, y: 0 });
+    setPinballSize({
+      width: window.innerWidth,
+      height: Math.max(360, window.innerHeight - TASKBAR_HEIGHT),
+    });
   }
 
   function onIconPointerDown(event, iconId) {
@@ -960,11 +955,42 @@ function App() {
             </button>
           </div>
           <div className="explorer-toolbar">
-            <button className="toolbar-btn" type="button">File</button>
-            <button className="toolbar-btn" type="button">Edit</button>
-            <button className="toolbar-btn" type="button">View</button>
-            <button className="toolbar-btn" type="button">Tools</button>
-            <button className="toolbar-btn" type="button">Help</button>
+            <button className="toolbar-btn toolbar-btn--icon" type="button">
+              <span className="tool-icon" aria-hidden="true">
+                🔍
+              </span>
+              <span>Search</span>
+            </button>
+            <button className="toolbar-btn toolbar-btn--icon" type="button">
+              <span className="tool-icon" aria-hidden="true">
+                ⭐
+              </span>
+              <span>Favorites</span>
+            </button>
+            <button className="toolbar-btn toolbar-btn--icon" type="button">
+              <span className="tool-icon" aria-hidden="true">
+                🕘
+              </span>
+              <span>History</span>
+            </button>
+            <button className="toolbar-btn toolbar-btn--icon" type="button">
+              <span className="tool-icon" aria-hidden="true">
+                🌐
+              </span>
+              <span>Channels</span>
+            </button>
+            <button className="toolbar-btn toolbar-btn--icon" type="button">
+              <span className="tool-icon" aria-hidden="true">
+                ⛶
+              </span>
+              <span>Fullscreen</span>
+            </button>
+            <button className="toolbar-btn toolbar-btn--icon" type="button">
+              <span className="tool-icon" aria-hidden="true">
+                ✉️
+              </span>
+              <span>Mail</span>
+            </button>
           </div>
           <div className="explorer-body">
             <aside className="explorer-sidebar">
@@ -1047,11 +1073,19 @@ function App() {
         >
           <div className="window-header" onPointerDown={onPinballHeaderPointerDown}>
             <span className="window-title">3D Pinball for Windows - Space Cadet</span>
-            <button className="close-btn" onClick={closePinball} aria-label="Close Pinball">
-              ×
-            </button>
+            <div className="window-actions">
+              <button className="fit-btn" onClick={fitPinballToWindow} aria-label="Fit Pinball Window">
+                <svg viewBox="0 0 24 24" className="fit-btn-icon" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <rect x="8" y="8" width="8" height="8" rx="1" />
+                </svg>
+              </button>
+              <button className="close-btn" onClick={closePinball} aria-label="Close Pinball">
+                ×
+              </button>
+            </div>
           </div>
-          <PinballGame isOpen={pinballOpen} onFitWindow={fitPinballToWindow} />
+          <PinballGame isOpen={pinballOpen} />
           <div
             className="pinball-resize-handle"
             onPointerDown={onPinballResizePointerDown}
