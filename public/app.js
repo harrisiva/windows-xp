@@ -759,6 +759,13 @@ function App() {
   const [notepadOpen, setNotepadOpen] = useState(false);
   const [pinballOpen, setPinballOpen] = useState(false);
   const [tetrisOpen, setTetrisOpen] = useState(false);
+  const [windowStack, setWindowStack] = useState([
+    "properties",
+    "explorer",
+    "notepad",
+    "pinball",
+    "tetris",
+  ]);
   const [dogBubbleOpen, setDogBubbleOpen] = useState(false);
   const [dogMessageIndex, setDogMessageIndex] = useState(0);
   const [readmeContent, setReadmeContent] = useState(
@@ -799,6 +806,14 @@ function App() {
       x: Math.min(Math.max(margin, x), Math.max(margin, window.innerWidth - width - margin)),
       y: Math.min(Math.max(margin, y), maxY),
     };
+  }
+
+  function bringWindowToFront(windowId) {
+    setWindowStack((prev) => [...prev.filter((id) => id !== windowId), windowId]);
+  }
+
+  function getWindowZ(windowId) {
+    return 30 + windowStack.indexOf(windowId);
   }
 
   useEffect(() => {
@@ -1054,6 +1069,7 @@ function App() {
     setMenu((prev) => ({ ...prev, visible: false }));
     setError("");
     setIsLoading(true);
+    bringWindowToFront("properties");
 
     try {
       const response = await fetch("/api/site-info");
@@ -1075,6 +1091,7 @@ function App() {
   }
 
   function openExplorer() {
+    bringWindowToFront("explorer");
     setExplorerOpen(true);
   }
 
@@ -1083,6 +1100,7 @@ function App() {
   }
 
   function openReadme() {
+    bringWindowToFront("notepad");
     setNotepadOpen(true);
   }
 
@@ -1102,6 +1120,7 @@ function App() {
     );
     setPinballSize(nextPinballSize);
     setPinballPos(nextPinballPos);
+    bringWindowToFront("pinball");
     setPinballOpen(true);
     setStartMenuOpen(false);
   }
@@ -1111,6 +1130,7 @@ function App() {
   }
 
   function openTetris() {
+    bringWindowToFront("tetris");
     setTetrisOpen(true);
     setStartMenuOpen(false);
   }
@@ -1403,7 +1423,8 @@ function App() {
     tetrisOpen && { id: "tetris", label: "Tetris", kind: "tetris" },
   ].filter(Boolean);
 
-  function onTaskbarWindowClick() {
+  function onTaskbarWindowClick(windowId) {
+    bringWindowToFront(windowId);
     setStartMenuOpen(false);
   }
 
@@ -1482,7 +1503,8 @@ function App() {
         <section
           ref={windowRef}
           className="properties-window"
-          style={{ left: windowPos.x, top: windowPos.y }}
+          style={{ left: windowPos.x, top: windowPos.y, zIndex: getWindowZ("properties") }}
+          onPointerDown={() => bringWindowToFront("properties")}
           role="dialog"
           aria-label="Properties window"
         >
@@ -1532,7 +1554,9 @@ function App() {
             top: explorerPos.y,
             width: explorerSize.width,
             height: explorerSize.height,
+            zIndex: getWindowZ("explorer"),
           }}
+          onPointerDown={() => bringWindowToFront("explorer")}
           role="dialog"
           aria-label="File Explorer"
         >
@@ -1609,7 +1633,9 @@ function App() {
             top: notepadPos.y,
             width: notepadSize.width,
             height: notepadSize.height,
+            zIndex: getWindowZ("notepad"),
           }}
+          onPointerDown={() => bringWindowToFront("notepad")}
           role="dialog"
           aria-label="Notepad"
         >
@@ -1655,7 +1681,9 @@ function App() {
             top: pinballPos.y,
             width: pinballSize.width,
             height: pinballSize.height,
+            zIndex: getWindowZ("pinball"),
           }}
+          onPointerDown={() => bringWindowToFront("pinball")}
           role="dialog"
           aria-label="3D Pinball"
         >
@@ -1675,7 +1703,8 @@ function App() {
         <section
           ref={tetrisRef}
           className="tetris-window"
-          style={{ left: tetrisPos.x, top: tetrisPos.y }}
+          style={{ left: tetrisPos.x, top: tetrisPos.y, zIndex: getWindowZ("tetris") }}
+          onPointerDown={() => bringWindowToFront("tetris")}
           role="dialog"
           aria-label="Tetris"
         >
@@ -1769,7 +1798,7 @@ function App() {
                 key={item.id}
                 type="button"
                 className="taskbar-window-btn"
-                onClick={onTaskbarWindowClick}
+                onClick={() => onTaskbarWindowClick(item.kind)}
                 title={item.label}
               >
                 <span className={`taskbar-window-dot taskbar-window-dot--${item.kind}`} aria-hidden="true" />
