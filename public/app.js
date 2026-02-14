@@ -1,6 +1,6 @@
 const { useEffect, useRef, useState } = React;
 
-function PinballGame({ isOpen }) {
+function PinballGame({ isOpen, onFitWindow }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(0);
   const keysRef = useRef({ left: false, right: false });
@@ -240,6 +240,9 @@ function PinballGame({ isOpen }) {
       <div className="pinball-toolbar">
         <span>Score: {score}</span>
         <span>Lives: {lives}</span>
+        <button type="button" className="pinball-launch-btn" onClick={onFitWindow}>
+          Fit to Window
+        </button>
         <button type="button" className="pinball-launch-btn" onClick={launchBall}>
           Launch
         </button>
@@ -278,6 +281,8 @@ function App() {
   const [explorerSize, setExplorerSize] = useState({ width: 640, height: 430 });
   const [notepadPos, setNotepadPos] = useState({ x: 220, y: 110 });
   const [notepadSize, setNotepadSize] = useState({ width: 620, height: 440 });
+  const [pinballPos, setPinballPos] = useState({ x: 200, y: 86 });
+  const [pinballSize, setPinballSize] = useState({ width: 610, height: 500 });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [windowPos, setWindowPos] = useState({ x: 120, y: 120 });
@@ -287,6 +292,7 @@ function App() {
   const windowRef = useRef(null);
   const explorerRef = useRef(null);
   const notepadRef = useRef(null);
+  const pinballRef = useRef(null);
 
   useEffect(() => {
     function closeMenu() {
@@ -395,6 +401,32 @@ function App() {
       };
     }
 
+    function clampPinballToViewport(x, y, width, height) {
+      const margin = 12;
+      const pinballWidth = width || pinballRef.current?.offsetWidth || 610;
+      const pinballHeight = height || pinballRef.current?.offsetHeight || 500;
+      const maxY = Math.max(margin, window.innerHeight - TASKBAR_HEIGHT - pinballHeight - margin);
+      return {
+        x: Math.min(Math.max(margin, x), Math.max(margin, window.innerWidth - pinballWidth - margin)),
+        y: Math.min(Math.max(margin, y), maxY),
+      };
+    }
+
+    function clampPinballSizeToViewport(width, height, x, y) {
+      const margin = 12;
+      const minWidth = 460;
+      const minHeight = 360;
+      const pinballRect = pinballRef.current?.getBoundingClientRect();
+      const left = x ?? pinballRect?.left ?? 200;
+      const top = y ?? pinballRect?.top ?? 86;
+      const maxWidth = Math.max(minWidth, window.innerWidth - left - margin);
+      const maxHeight = Math.max(minHeight, window.innerHeight - TASKBAR_HEIGHT - top - margin);
+      return {
+        width: Math.min(Math.max(minWidth, width), maxWidth),
+        height: Math.min(Math.max(minHeight, height), maxHeight),
+      };
+    }
+
     function clampIconToDesktop(x, y) {
       const desktop = desktopRef.current;
       if (!desktop) {
@@ -433,6 +465,12 @@ function App() {
         setNotepadPos(clampNotepadToViewport(nextX, nextY));
       }
 
+      if (dragState.current.target === "pinball-window") {
+        const nextX = event.clientX - dragState.current.offsetX;
+        const nextY = event.clientY - dragState.current.offsetY;
+        setPinballPos(clampPinballToViewport(nextX, nextY));
+      }
+
       if (dragState.current.target === "explorer-resize") {
         const deltaX = event.clientX - dragState.current.startX;
         const deltaY = event.clientY - dragState.current.startY;
@@ -447,6 +485,14 @@ function App() {
         const nextWidth = dragState.current.startWidth + deltaX;
         const nextHeight = dragState.current.startHeight + deltaY;
         setNotepadSize(clampNotepadSizeToViewport(nextWidth, nextHeight));
+      }
+
+      if (dragState.current.target === "pinball-resize") {
+        const deltaX = event.clientX - dragState.current.startX;
+        const deltaY = event.clientY - dragState.current.startY;
+        const nextWidth = dragState.current.startWidth + deltaX;
+        const nextHeight = dragState.current.startHeight + deltaY;
+        setPinballSize(clampPinballSizeToViewport(nextWidth, nextHeight));
       }
 
       if (dragState.current.target === "icon") {
@@ -480,6 +526,8 @@ function App() {
       setExplorerPos((prev) => clampExplorerToViewport(prev.x, prev.y));
       setNotepadSize((prev) => clampNotepadSizeToViewport(prev.width, prev.height));
       setNotepadPos((prev) => clampNotepadToViewport(prev.x, prev.y));
+      setPinballSize((prev) => clampPinballSizeToViewport(prev.width, prev.height));
+      setPinballPos((prev) => clampPinballToViewport(prev.x, prev.y));
     }
 
     window.addEventListener("pointermove", onPointerMove);
@@ -654,6 +702,55 @@ function App() {
       offsetY: event.clientY - rect.top,
     };
     document.body.classList.add("is-dragging");
+  }
+
+  function onPinballHeaderPointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (event.target.closest("button")) {
+      return;
+    }
+
+    const rect = pinballRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    dragState.current = {
+      target: "pinball-window",
+      id: null,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    document.body.classList.add("is-dragging");
+  }
+
+  function onPinballResizePointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    dragState.current = {
+      target: "pinball-resize",
+      id: null,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: pinballSize.width,
+      startHeight: pinballSize.height,
+    };
+    document.body.classList.add("is-dragging");
+  }
+
+  function fitPinballToWindow() {
+    const margin = 12;
+    const maxWidth = window.innerWidth - margin * 2;
+    const maxHeight = window.innerHeight - TASKBAR_HEIGHT - margin * 2;
+    const width = Math.max(460, Math.min(maxWidth, Math.floor(maxHeight * (560 / 360))));
+    const height = Math.max(360, Math.min(maxHeight, Math.floor(width * (360 / 560)) + 78));
+    setPinballPos({ x: margin, y: margin });
+    setPinballSize({ width, height });
   }
 
   function onIconPointerDown(event, iconId) {
@@ -936,14 +1033,30 @@ function App() {
       )}
 
       {pinballOpen && (
-        <section className="pinball-window" role="dialog" aria-label="3D Pinball">
-          <div className="window-header">
+        <section
+          ref={pinballRef}
+          className="pinball-window"
+          style={{
+            left: pinballPos.x,
+            top: pinballPos.y,
+            width: pinballSize.width,
+            height: pinballSize.height,
+          }}
+          role="dialog"
+          aria-label="3D Pinball"
+        >
+          <div className="window-header" onPointerDown={onPinballHeaderPointerDown}>
             <span className="window-title">3D Pinball for Windows - Space Cadet</span>
             <button className="close-btn" onClick={closePinball} aria-label="Close Pinball">
               ×
             </button>
           </div>
-          <PinballGame isOpen={pinballOpen} />
+          <PinballGame isOpen={pinballOpen} onFitWindow={fitPinballToWindow} />
+          <div
+            className="pinball-resize-handle"
+            onPointerDown={onPinballResizePointerDown}
+            aria-hidden="true"
+          />
         </section>
       )}
 
