@@ -1,0 +1,13 @@
+{
+  "name": "desktop-spa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Simple desktop-style SPA with React frontend and Express backend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
