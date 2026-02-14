@@ -707,6 +707,13 @@ const DEFAULT_ICONS = [
   { id: "tetris", label: "Tetris", type: "tetris-app" },
 ];
 
+const DOG_MESSAGES = [
+  "Hi! Need help finding anything on your desktop?",
+  "Tip: Double-click desktop icons to open them.",
+  "You can drag windows by the blue title bar.",
+  "This setup looks very Windows XP. Nice work.",
+];
+
 function calculateResponsivePinballSize(viewportWidth, viewportHeight, taskbarHeight) {
   const margin = 24;
   const minWindowWidth = 420;
@@ -752,6 +759,8 @@ function App() {
   const [notepadOpen, setNotepadOpen] = useState(false);
   const [pinballOpen, setPinballOpen] = useState(false);
   const [tetrisOpen, setTetrisOpen] = useState(false);
+  const [dogBubbleOpen, setDogBubbleOpen] = useState(false);
+  const [dogMessageIndex, setDogMessageIndex] = useState(0);
   const [readmeContent, setReadmeContent] = useState(
     "Welcome to this Windows XP desktop web app.\n\nYou can edit this file. Changes stay until you refresh the page."
   );
@@ -1110,6 +1119,15 @@ function App() {
     setTetrisOpen(false);
   }
 
+  function onDogClick() {
+    setDogBubbleOpen((prevOpen) => {
+      if (prevOpen) {
+        setDogMessageIndex((prev) => (prev + 1) % DOG_MESSAGES.length);
+      }
+      return !prevOpen;
+    });
+  }
+
   function changeReadmeFontSize(delta) {
     setReadmeFontSize((prev) => Math.min(28, Math.max(10, prev + delta)));
   }
@@ -1409,6 +1427,29 @@ function App() {
           <div className="icon-label">{icon.label}</div>
         </div>
       ))}
+
+      <section className="xp-dog" aria-label="Desktop assistant">
+        <button type="button" className="xp-dog-btn" onClick={onDogClick} aria-label="Toggle assistant bubble">
+          <div className="xp-dog-sprite" aria-hidden="true">
+            <span className="xp-dog-ear xp-dog-ear--left" />
+            <span className="xp-dog-ear xp-dog-ear--right" />
+            <span className="xp-dog-head">
+              <span className="xp-dog-eye xp-dog-eye--left" />
+              <span className="xp-dog-eye xp-dog-eye--right" />
+              <span className="xp-dog-nose" />
+            </span>
+            <span className="xp-dog-body" />
+            <span className="xp-dog-tail" />
+            <span className="xp-dog-paw xp-dog-paw--left" />
+            <span className="xp-dog-paw xp-dog-paw--right" />
+          </div>
+        </button>
+        {dogBubbleOpen && (
+          <div className="xp-dog-bubble" role="status" aria-live="polite">
+            {DOG_MESSAGES[dogMessageIndex]}
+          </div>
+        )}
+      </section>
 
       {menu.visible && (
         <div className="context-menu" style={{ left: menu.x, top: menu.y }}>
