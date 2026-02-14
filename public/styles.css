@@ -197,6 +197,59 @@ body,
   z-index: 37;
 }
 
+.tetris-window {
+  position: fixed;
+  top: 96px;
+  left: 260px;
+  width: min(360px, calc(100vw - 24px));
+  border: 1px solid #083c84;
+  border-radius: 7px;
+  background: #ffffff;
+  box-shadow: 0 11px 24px rgba(0, 0, 0, 0.52);
+  overflow: hidden;
+  z-index: 38;
+}
+
+.tetris-game {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  background: linear-gradient(180deg, #d0e2ff 0%, #aec9ef 100%);
+}
+
+.tetris-toolbar {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 10px;
+  border: 1px solid #8fafdb;
+  border-bottom: 0;
+  background: linear-gradient(180deg, #f8fbff, #dbeaff);
+  color: #1c2f50;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: "Lucida Console", "Courier New", monospace;
+}
+
+.tetris-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border: 1px solid #2a4d7a;
+  background: #0c1730;
+}
+
+.tetris-status {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #1f3557;
+  text-align: center;
+  min-height: 16px;
+}
+
 .pinball-game {
   height: calc(100% - 32px);
   display: flex;

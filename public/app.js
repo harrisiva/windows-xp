@@ -376,12 +376,335 @@ function PinballGame({ isOpen }) {
   );
 }
 
+function TetrisGame({ isOpen }) {
+  const canvasRef = useRef(null);
+  const rafRef = useRef(0);
+  const stateRef = useRef(null);
+  const [score, setScore] = useState(0);
+  const [lines, setLines] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [status, setStatus] = useState("Arrow keys to move. Up to rotate.");
+
+  const PIECES = [
+    { shape: [[1, 1, 1, 1]], color: "#45d8ff" }, // I
+    { shape: [[1, 0, 0], [1, 1, 1]], color: "#3f58ff" }, // J
+    { shape: [[0, 0, 1], [1, 1, 1]], color: "#ff9933" }, // L
+    { shape: [[1, 1], [1, 1]], color: "#ffe34f" }, // O
+    { shape: [[0, 1, 1], [1, 1, 0]], color: "#61e66b" }, // S
+    { shape: [[0, 1, 0], [1, 1, 1]], color: "#c766ff" }, // T
+    { shape: [[1, 1, 0], [0, 1, 1]], color: "#ff5b66" }, // Z
+  ];
+
+  function emptyBoard() {
+    return Array.from({ length: 20 }, () => Array(10).fill(null));
+  }
+
+  function cloneMatrix(m) {
+    return m.map((row) => row.slice());
+  }
+
+  function randomPiece() {
+    const pick = PIECES[Math.floor(Math.random() * PIECES.length)];
+    return { shape: cloneMatrix(pick.shape), color: pick.color };
+  }
+
+  function rotateMatrix(matrix) {
+    return matrix[0].map((_, x) => matrix.map((row) => row[x]).reverse());
+  }
+
+  function collides(board, piece, x, y) {
+    for (let py = 0; py < piece.shape.length; py += 1) {
+      for (let px = 0; px < piece.shape[py].length; px += 1) {
+        if (!piece.shape[py][px]) {
+          continue;
+        }
+        const nx = x + px;
+        const ny = y + py;
+        if (nx < 0 || nx >= 10 || ny >= 20) {
+          return true;
+        }
+        if (ny >= 0 && board[ny][nx]) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function mergePiece(board, piece, x, y) {
+    for (let py = 0; py < piece.shape.length; py += 1) {
+      for (let px = 0; px < piece.shape[py].length; px += 1) {
+        if (!piece.shape[py][px]) {
+          continue;
+        }
+        const ny = y + py;
+        const nx = x + px;
+        if (ny >= 0 && ny < 20 && nx >= 0 && nx < 10) {
+          board[ny][nx] = piece.color;
+        }
+      }
+    }
+  }
+
+  function clearLines(board) {
+    let cleared = 0;
+    for (let y = board.length - 1; y >= 0; y -= 1) {
+      if (board[y].every(Boolean)) {
+        board.splice(y, 1);
+        board.unshift(Array(10).fill(null));
+        cleared += 1;
+        y += 1;
+      }
+    }
+    return cleared;
+  }
+
+  function spawnPiece(state) {
+    state.piece = state.next;
+    state.next = randomPiece();
+    state.pieceX = Math.floor((10 - state.piece.shape[0].length) / 2);
+    state.pieceY = -1;
+    if (collides(state.board, state.piece, state.pieceX, state.pieceY + 1)) {
+      state.gameOver = true;
+      setStatus("Game over. Press R to restart.");
+    }
+  }
+
+  function resetGame() {
+    stateRef.current = {
+      board: emptyBoard(),
+      piece: null,
+      next: randomPiece(),
+      pieceX: 0,
+      pieceY: 0,
+      lastTime: performance.now(),
+      dropAccumulator: 0,
+      dropInterval: 900,
+      lines: 0,
+      level: 1,
+      gameOver: false,
+    };
+    spawnPiece(stateRef.current);
+    setScore(0);
+    setLines(0);
+    setLevel(1);
+    setStatus("Arrow keys to move. Up to rotate.");
+  }
+
+  function hardDrop(state) {
+    while (!collides(state.board, state.piece, state.pieceX, state.pieceY + 1)) {
+      state.pieceY += 1;
+    }
+  }
+
+  function lockAndAdvance(state) {
+    mergePiece(state.board, state.piece, state.pieceX, state.pieceY);
+    const cleared = clearLines(state.board);
+    if (cleared > 0) {
+      state.lines += cleared;
+      state.level = Math.floor(state.lines / 10) + 1;
+      state.dropInterval = Math.max(120, 900 - (state.level - 1) * 75);
+      setLines(state.lines);
+      setLevel(state.level);
+      setScore((prevScore) => prevScore + [0, 100, 300, 500, 800][cleared] * state.level);
+      setStatus(cleared >= 4 ? "TETRIS!" : `${cleared} line cleared`);
+    }
+    spawnPiece(state);
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      cancelAnimationFrame(rafRef.current);
+      return;
+    }
+
+    resetGame();
+
+    function onKeyDown(event) {
+      const state = stateRef.current;
+      if (!state || state.gameOver) {
+        if (event.key.toLowerCase() === "r") {
+          resetGame();
+        }
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        if (!collides(state.board, state.piece, state.pieceX - 1, state.pieceY)) {
+          state.pieceX -= 1;
+        }
+      } else if (event.key === "ArrowRight") {
+        if (!collides(state.board, state.piece, state.pieceX + 1, state.pieceY)) {
+          state.pieceX += 1;
+        }
+      } else if (event.key === "ArrowDown") {
+        if (!collides(state.board, state.piece, state.pieceX, state.pieceY + 1)) {
+          state.pieceY += 1;
+          setScore((prev) => prev + 1);
+        }
+      } else if (event.key === "ArrowUp") {
+        const rotated = rotateMatrix(state.piece.shape);
+        const candidate = { ...state.piece, shape: rotated };
+        if (!collides(state.board, candidate, state.pieceX, state.pieceY)) {
+          state.piece = candidate;
+        }
+      } else if (event.code === "Space") {
+        event.preventDefault();
+        hardDrop(state);
+        lockAndAdvance(state);
+      } else if (event.key.toLowerCase() === "r") {
+        resetGame();
+      }
+    }
+
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!ctx) {
+      return undefined;
+    }
+
+    function drawBlock(x, y, color, cell) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x * cell, y * cell, cell, cell);
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.35)";
+      ctx.strokeRect(x * cell, y * cell, cell, cell);
+      ctx.strokeStyle = "rgba(255,255,255,0.28)";
+      ctx.beginPath();
+      ctx.moveTo(x * cell + 1, y * cell + 1);
+      ctx.lineTo((x + 1) * cell - 1, y * cell + 1);
+      ctx.lineTo((x + 1) * cell - 1, (y + 1) * cell - 1);
+      ctx.stroke();
+    }
+
+    function animate(time) {
+      const state = stateRef.current;
+      if (!state) {
+        return;
+      }
+
+      const delta = time - state.lastTime;
+      state.lastTime = time;
+      if (!state.gameOver) {
+        state.dropAccumulator += delta;
+        if (state.dropAccumulator >= state.dropInterval) {
+          state.dropAccumulator = 0;
+          if (!collides(state.board, state.piece, state.pieceX, state.pieceY + 1)) {
+            state.pieceY += 1;
+          } else {
+            lockAndAdvance(state);
+          }
+        }
+      }
+
+      const cell = 20;
+      ctx.clearRect(0, 0, 300, 420);
+      const bg = ctx.createLinearGradient(0, 0, 0, 420);
+      bg.addColorStop(0, "#121a34");
+      bg.addColorStop(1, "#0a1022");
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, 300, 420);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
+      for (let gx = 0; gx <= 10; gx += 1) {
+        ctx.beginPath();
+        ctx.moveTo(gx * cell, 0);
+        ctx.lineTo(gx * cell, 400);
+        ctx.stroke();
+      }
+      for (let gy = 0; gy <= 20; gy += 1) {
+        ctx.beginPath();
+        ctx.moveTo(0, gy * cell);
+        ctx.lineTo(200, gy * cell);
+        ctx.stroke();
+      }
+
+      state.board.forEach((row, y) => {
+        row.forEach((color, x) => {
+          if (color) {
+            drawBlock(x, y, color, cell);
+          }
+        });
+      });
+
+      if (state.piece) {
+        state.piece.shape.forEach((row, py) => {
+          row.forEach((value, px) => {
+            if (value && state.pieceY + py >= 0) {
+              drawBlock(state.pieceX + px, state.pieceY + py, state.piece.color, cell);
+            }
+          });
+        });
+      }
+
+      ctx.fillStyle = "#1a2848";
+      ctx.fillRect(206, 10, 84, 390);
+      ctx.strokeStyle = "#3c5788";
+      ctx.strokeRect(206, 10, 84, 390);
+      ctx.fillStyle = "#d9e8ff";
+      ctx.font = "12px Tahoma";
+      ctx.fillText("NEXT", 230, 28);
+      ctx.fillText("SCORE", 220, 160);
+      ctx.fillText(String(score), 220, 178);
+      ctx.fillText("LINES", 220, 224);
+      ctx.fillText(String(lines), 220, 242);
+      ctx.fillText("LEVEL", 220, 288);
+      ctx.fillText(String(level), 220, 306);
+
+      if (state.next) {
+        const nx = 224;
+        const ny = 52;
+        const nCell = 14;
+        state.next.shape.forEach((row, py) => {
+          row.forEach((value, px) => {
+            if (value) {
+              ctx.fillStyle = state.next.color;
+              ctx.fillRect(nx + px * nCell, ny + py * nCell, nCell, nCell);
+              ctx.strokeStyle = "rgba(0,0,0,0.35)";
+              ctx.strokeRect(nx + px * nCell, ny + py * nCell, nCell, nCell);
+            }
+          });
+        });
+      }
+
+      if (state.gameOver) {
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(0, 0, 300, 420);
+        ctx.fillStyle = "#ffcfcf";
+        ctx.font = "bold 20px Tahoma";
+        ctx.fillText("GAME OVER", 78, 196);
+      }
+
+      rafRef.current = requestAnimationFrame(animate);
+    }
+
+    rafRef.current = requestAnimationFrame(animate);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className="tetris-game">
+      <div className="tetris-toolbar">
+        <span>Score: {String(score).padStart(6, "0")}</span>
+        <span>Lines: {lines}</span>
+        <span>Level: {level}</span>
+      </div>
+      <canvas ref={canvasRef} className="tetris-canvas" width={300} height={420} />
+      <div className="tetris-status">{status}</div>
+    </div>
+  );
+}
+
 const DEFAULT_ICONS = [
   { id: "computer", label: "My Computer", type: "computer" },
   { id: "recycle", label: "Recycle Bin", type: "recycle-shortcut" },
   { id: "cmd", label: "Command Prompt", type: "cmd-shortcut" },
   { id: "readme", label: "readme.txt", type: "text-file" },
   { id: "pinball", label: "3D Pinball", type: "pinball-app" },
+  { id: "tetris", label: "Tetris", type: "tetris-app" },
 ];
 
 function App() {
@@ -396,6 +719,7 @@ function App() {
   const [explorerOpen, setExplorerOpen] = useState(false);
   const [notepadOpen, setNotepadOpen] = useState(false);
   const [pinballOpen, setPinballOpen] = useState(false);
+  const [tetrisOpen, setTetrisOpen] = useState(false);
   const [readmeContent, setReadmeContent] = useState(
     "Welcome to this Windows XP desktop web app.\n\nYou can edit this file. Changes stay until you refresh the page."
   );
@@ -717,6 +1041,15 @@ function App() {
     setPinballOpen(false);
   }
 
+  function openTetris() {
+    setTetrisOpen(true);
+    setStartMenuOpen(false);
+  }
+
+  function closeTetris() {
+    setTetrisOpen(false);
+  }
+
   function changeReadmeFontSize(delta) {
     setReadmeFontSize((prev) => Math.min(28, Math.max(10, prev + delta)));
   }
@@ -950,6 +1283,21 @@ function App() {
       );
     }
 
+    if (type === "tetris-app") {
+      return (
+        <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">
+          <rect x="10" y="10" width="44" height="44" rx="6" fill="#0f1f3a" stroke="#4a6ca2" strokeWidth="2" />
+          <rect x="16" y="18" width="10" height="10" fill="#45d8ff" />
+          <rect x="26" y="18" width="10" height="10" fill="#45d8ff" />
+          <rect x="36" y="18" width="10" height="10" fill="#45d8ff" />
+          <rect x="26" y="30" width="10" height="10" fill="#ff5b66" />
+          <rect x="36" y="30" width="10" height="10" fill="#ff5b66" />
+          <rect x="16" y="40" width="10" height="10" fill="#ffe34f" />
+          <rect x="26" y="40" width="10" height="10" fill="#ffe34f" />
+        </svg>
+      );
+    }
+
     if (type === "text-file") {
       return (
         <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">
@@ -985,6 +1333,8 @@ function App() {
                 ? openReadme
                 : icon.id === "pinball"
                   ? openPinball
+                  : icon.id === "tetris"
+                    ? openTetris
                   : undefined
           }
           onContextMenu={
@@ -1220,6 +1570,18 @@ function App() {
         </section>
       )}
 
+      {tetrisOpen && (
+        <section className="tetris-window" role="dialog" aria-label="Tetris">
+          <div className="window-header">
+            <span className="window-title">Tetris</span>
+            <button className="close-btn" onClick={closeTetris} aria-label="Close Tetris">
+              ×
+            </button>
+          </div>
+          <TetrisGame isOpen={tetrisOpen} />
+        </section>
+      )}
+
       {startMenuOpen && (
         <section className="start-menu" role="dialog" aria-label="Start menu" onClick={(event) => event.stopPropagation()}>
           <div className="start-menu-top">
@@ -1249,6 +1611,9 @@ function App() {
               </button>
               <button className="start-item" type="button" onClick={openPinball}>
                 3D Pinball
+              </button>
+              <button className="start-item" type="button" onClick={openTetris}>
+                Tetris
               </button>
             </div>
             <div className="start-right">
