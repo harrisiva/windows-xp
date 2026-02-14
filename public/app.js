@@ -780,6 +780,7 @@ function App() {
   const [explorerSize, setExplorerSize] = useState({ width: 640, height: 430 });
   const [notepadPos, setNotepadPos] = useState({ x: 220, y: 110 });
   const [notepadSize, setNotepadSize] = useState({ width: 620, height: 440 });
+  const [geminiPos, setGeminiPos] = useState({ x: 280, y: 138 });
   const [pinballPos, setPinballPos] = useState({ x: 200, y: 86 });
   const [pinballSize, setPinballSize] = useState(() => {
     const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
@@ -808,6 +809,7 @@ function App() {
   const windowRef = useRef(null);
   const explorerRef = useRef(null);
   const notepadRef = useRef(null);
+  const geminiRef = useRef(null);
   const pinballRef = useRef(null);
   const tetrisRef = useRef(null);
 
@@ -945,6 +947,17 @@ function App() {
       };
     }
 
+    function clampGeminiToViewport(x, y, width, height) {
+      const margin = 12;
+      const geminiWidth = width || geminiRef.current?.offsetWidth || 540;
+      const geminiHeight = height || geminiRef.current?.offsetHeight || 240;
+      const maxY = Math.max(margin, window.innerHeight - TASKBAR_HEIGHT - geminiHeight - margin);
+      return {
+        x: Math.min(Math.max(margin, x), Math.max(margin, window.innerWidth - geminiWidth - margin)),
+        y: Math.min(Math.max(margin, y), maxY),
+      };
+    }
+
     function clampPinballToViewport(x, y, width, height) {
       const margin = 12;
       const pinballWidth = width || pinballRef.current?.offsetWidth || 610;
@@ -1011,6 +1024,12 @@ function App() {
         setPinballPos(clampPinballToViewport(nextX, nextY));
       }
 
+      if (dragState.current.target === "gemini-window") {
+        const nextX = event.clientX - dragState.current.offsetX;
+        const nextY = event.clientY - dragState.current.offsetY;
+        setGeminiPos(clampGeminiToViewport(nextX, nextY));
+      }
+
       if (dragState.current.target === "tetris-window") {
         const nextX = event.clientX - dragState.current.offsetX;
         const nextY = event.clientY - dragState.current.offsetY;
@@ -1064,6 +1083,7 @@ function App() {
       setExplorerPos((prev) => clampExplorerToViewport(prev.x, prev.y));
       setNotepadSize((prev) => clampNotepadSizeToViewport(prev.width, prev.height));
       setNotepadPos((prev) => clampNotepadToViewport(prev.x, prev.y));
+      setGeminiPos((prev) => clampGeminiToViewport(prev.x, prev.y));
       const nextPinballSize = getResponsivePinballSize();
       setPinballSize(nextPinballSize);
       setPinballPos((prev) =>
@@ -1141,7 +1161,12 @@ function App() {
   }
 
   function saveGeminiKey() {
-    setGeminiApiKey(geminiDraft);
+    const trimmed = geminiDraft.trim();
+    if (!trimmed) {
+      return;
+    }
+    setGeminiApiKey(trimmed);
+    setGeminiOpen(false);
   }
 
   function openPinball() {
@@ -1310,6 +1335,29 @@ function App() {
 
     dragState.current = {
       target: "pinball-window",
+      id: null,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    document.body.classList.add("is-dragging");
+  }
+
+  function onGeminiHeaderPointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (event.target.closest("button")) {
+      return;
+    }
+
+    const rect = geminiRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    dragState.current = {
+      target: "gemini-window",
       id: null,
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
@@ -1488,11 +1536,10 @@ function App() {
           className={`icon ${icon.type.endsWith("shortcut") ? "icon--shortcut" : ""}`}
           style={{ left: icon.x, top: icon.y }}
           onPointerDown={(event) => onIconPointerDown(event, icon.id)}
-          onClick={icon.id === "gemini" ? openGeminiKey : undefined}
           onDoubleClick={
             icon.id === "computer"
               ? openExplorer
-              : icon.id === "readme"
+                : icon.id === "readme"
                 ? openReadme
                 : icon.id === "gemini"
                   ? openGeminiKey
@@ -1729,13 +1776,14 @@ function App() {
 
       {geminiOpen && (
         <section
+          ref={geminiRef}
           className="gemini-window"
-          style={{ zIndex: getWindowZ("gemini") }}
+          style={{ left: geminiPos.x, top: geminiPos.y, zIndex: getWindowZ("gemini") }}
           onPointerDown={() => bringWindowToFront("gemini")}
           role="dialog"
           aria-label="Gemini API Key"
         >
-          <div className="window-header">
+          <div className="window-header" onPointerDown={onGeminiHeaderPointerDown}>
             <span className="window-title">Gemini API Key</span>
             <button className="close-btn" onClick={closeGeminiKey} aria-label="Close Gemini API Key">
               ×
@@ -1753,7 +1801,7 @@ function App() {
               placeholder="Paste your Gemini API key"
             />
             <div className="gemini-actions">
-              <button className="toolbar-btn" type="button" onClick={saveGeminiKey}>
+              <button className="toolbar-btn" type="button" onClick={saveGeminiKey} disabled={!geminiDraft.trim()}>
                 Save Key
               </button>
               <button className="toolbar-btn" type="button" onClick={closeGeminiKey}>

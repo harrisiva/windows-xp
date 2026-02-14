@@ -393,9 +393,6 @@ body,
 
 .gemini-window {
   position: fixed;
-  left: 50%;
-  top: 46%;
-  transform: translate(-50%, -50%);
   width: min(540px, calc(100vw - 24px));
   border: 1px solid #083c84;
   border-radius: 7px;
