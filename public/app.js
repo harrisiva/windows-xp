@@ -838,6 +838,17 @@ function App() {
   });
   const [geminiStatus, setGeminiStatus] = useState("inactive");
   const [geminiStatusMessage, setGeminiStatusMessage] = useState("No API key validated yet.");
+  const [desktopGeminiPos, setDesktopGeminiPos] = useState(() => {
+    const margin = 6;
+    const defaultY = 10;
+    if (typeof window === "undefined") {
+      return { x: margin, y: defaultY };
+    }
+    return {
+      x: Math.max(margin, window.innerWidth - 200),
+      y: defaultY,
+    };
+  });
   const [cmdInput, setCmdInput] = useState("");
   const [cmdFontSize, setCmdFontSize] = useState(14);
   const [cmdBusy, setCmdBusy] = useState(false);
@@ -859,6 +870,7 @@ function App() {
   const cmdRef = useRef(null);
   const cmdOutputRef = useRef(null);
   const geminiRef = useRef(null);
+  const desktopGeminiRef = useRef(null);
   const pinballRef = useRef(null);
   const tetrisRef = useRef(null);
 
@@ -930,6 +942,14 @@ function App() {
       outputEl.scrollTop = outputEl.scrollHeight;
     }
   }, [cmdLines, cmdOpen]);
+
+  useEffect(() => {
+    const margin = 6;
+    const top = 10;
+    const chipWidth = desktopGeminiRef.current?.offsetWidth || 170;
+    const nextX = Math.max(margin, window.innerWidth - chipWidth - margin);
+    setDesktopGeminiPos({ x: nextX, y: top });
+  }, []);
 
   useEffect(() => {
     function closeMenu() {
@@ -1097,6 +1117,18 @@ function App() {
       };
     }
 
+    function clampDesktopGeminiToViewport(x, y, width, height) {
+      const margin = 6;
+      const chipWidth = width || desktopGeminiRef.current?.offsetWidth || 170;
+      const chipHeight = height || desktopGeminiRef.current?.offsetHeight || 32;
+      const maxX = Math.max(margin, window.innerWidth - chipWidth - margin);
+      const maxY = Math.max(margin, window.innerHeight - TASKBAR_HEIGHT - chipHeight - margin);
+      return {
+        x: Math.min(Math.max(margin, x), maxX),
+        y: Math.min(Math.max(margin, y), maxY),
+      };
+    }
+
     function clampIconToDesktop(x, y) {
       const desktop = desktopRef.current;
       if (!desktop) {
@@ -1157,6 +1189,12 @@ function App() {
         const nextX = event.clientX - dragState.current.offsetX;
         const nextY = event.clientY - dragState.current.offsetY;
         setTetrisPos(clampTetrisToViewport(nextX, nextY));
+      }
+
+      if (dragState.current.target === "desktop-gemini-status") {
+        const nextX = event.clientX - dragState.current.offsetX;
+        const nextY = event.clientY - dragState.current.offsetY;
+        setDesktopGeminiPos(clampDesktopGeminiToViewport(nextX, nextY));
       }
 
       if (dragState.current.target === "explorer-resize") {
@@ -1223,6 +1261,7 @@ function App() {
         clampPinballToViewport(prev.x, prev.y, nextPinballSize.width, nextPinballSize.height)
       );
       setTetrisPos((prev) => clampTetrisToViewport(prev.x, prev.y));
+      setDesktopGeminiPos((prev) => clampDesktopGeminiToViewport(prev.x, prev.y));
     }
 
     window.addEventListener("pointermove", onPointerMove);
@@ -1619,6 +1658,29 @@ function App() {
     document.body.classList.add("is-dragging");
   }
 
+  function onDesktopGeminiStatusPointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (event.target.closest("button")) {
+      return;
+    }
+
+    const rect = desktopGeminiRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    dragState.current = {
+      target: "desktop-gemini-status",
+      id: null,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    document.body.classList.add("is-dragging");
+  }
+
   function onIconPointerDown(event, iconId) {
     if (event.button !== 0) {
       return;
@@ -1754,6 +1816,10 @@ function App() {
     pinballOpen && { id: "pinball", label: "3D Pinball", kind: "pinball" },
     tetrisOpen && { id: "tetris", label: "Tetris", kind: "tetris" },
   ].filter(Boolean);
+  const openWindowIds = new Set(openTaskbarItems.map((item) => item.id));
+  const topOpenWindowId = [...windowStack].reverse().find((id) => openWindowIds.has(id)) || null;
+  const clippyTopWindowIds = new Set(["gemini", "cmd"]);
+  const clippyZIndex = clippyTopWindowIds.has(topOpenWindowId) ? 90 : 26;
 
   function onTaskbarWindowClick(windowId) {
     bringWindowToFront(windowId);
@@ -1771,7 +1837,10 @@ function App() {
   return (
     <main ref={desktopRef} className="desktop">
       <section
+        ref={desktopGeminiRef}
         className="desktop-gemini-status"
+        style={{ left: desktopGeminiPos.x, top: desktopGeminiPos.y }}
+        onPointerDown={onDesktopGeminiStatusPointerDown}
         onContextMenu={onDesktopGeminiRefresh}
         aria-label="Gemini connection status"
       >
@@ -1831,7 +1900,7 @@ function App() {
         </div>
       ))}
 
-      <section className="xp-dog" aria-label="Desktop assistant">
+      <section className="xp-dog" aria-label="Desktop assistant" style={{ zIndex: clippyZIndex }}>
         <button type="button" className="xp-dog-btn" onClick={onDogClick} aria-label="Toggle assistant bubble">
           <div className="xp-dog-sprite" aria-hidden="true">
             <svg className="xp-clippy-svg" viewBox="0 0 180 220" role="img" aria-label="Clippy">
