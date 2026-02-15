@@ -19,7 +19,7 @@ It recreates classic XP vibes while adding playful features like:
 <img width="1470" height="917" alt="Windows XP apps and games" src="https://github.com/user-attachments/assets/ac76b140-d7b3-4f96-9e87-63ad8a0eaf3d" />
 
 ### Gemini in CMD
-<img width="1470" height="917" alt="Gemini chat through command prompt" src="https://github.com/user-attachments/assets/17720a95-de34-41ee-8c53-e38c9b010b54" />
+<img width="1470" height="918" alt="image" src="https://github.com/user-attachments/assets/7dc4548c-6986-444b-a453-9e8e1984d75d" />
 
 ## Tech Stack
 
