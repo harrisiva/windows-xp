@@ -708,11 +708,11 @@ const DEFAULT_ICONS = [
   { id: "tetris", label: "Tetris", type: "tetris-app" },
 ];
 
-const DOG_MESSAGES = [
-  "Hi! Need help finding anything on your desktop?",
+const CLIPPY_MESSAGES = [
+  "It looks like you're building an XP desktop.",
   "Tip: Double-click desktop icons to open them.",
   "You can drag windows by the blue title bar.",
-  "This setup looks very Windows XP. Nice work.",
+  "Need help with Gemini setup? Open the API key shortcut.",
 ];
 
 function calculateResponsivePinballSize(viewportWidth, viewportHeight, taskbarHeight) {
@@ -1346,7 +1346,7 @@ function App() {
   function saveGeminiKey() {
     const trimmed = geminiDraft.trim();
     if (!trimmed) {
-      setDogCustomMessage("Woof! I need a Gemini API key before I can save it.");
+      setDogCustomMessage("I need a Gemini API key before I can save it.");
       setDogBubbleOpen(true);
       return;
     }
@@ -1391,7 +1391,7 @@ function App() {
     setDogCustomMessage("");
     setDogBubbleOpen((prevOpen) => {
       if (prevOpen) {
-        setDogMessageIndex((prev) => (prev + 1) % DOG_MESSAGES.length);
+        setDogMessageIndex((prev) => (prev + 1) % CLIPPY_MESSAGES.length);
       }
       return !prevOpen;
     });
@@ -1834,22 +1834,31 @@ function App() {
       <section className="xp-dog" aria-label="Desktop assistant">
         <button type="button" className="xp-dog-btn" onClick={onDogClick} aria-label="Toggle assistant bubble">
           <div className="xp-dog-sprite" aria-hidden="true">
-            <span className="xp-dog-ear xp-dog-ear--left" />
-            <span className="xp-dog-ear xp-dog-ear--right" />
-            <span className="xp-dog-head">
-              <span className="xp-dog-eye xp-dog-eye--left" />
-              <span className="xp-dog-eye xp-dog-eye--right" />
-              <span className="xp-dog-nose" />
-            </span>
-            <span className="xp-dog-body" />
-            <span className="xp-dog-tail" />
-            <span className="xp-dog-paw xp-dog-paw--left" />
-            <span className="xp-dog-paw xp-dog-paw--right" />
+            <svg className="xp-clippy-svg" viewBox="0 0 180 220" role="img" aria-label="Clippy">
+              <g shapeRendering="crispEdges">
+                <path
+                  className="xp-clippy-body"
+                  d="M96 20c32 0 58 25 58 56 0 21-11 38-28 48v56c0 17-14 31-30 31s-30-14-30-31V92c0-18 14-32 32-32s32 14 32 32v71c0 8-6 14-14 14s-14-6-14-14v-49"
+                />
+                <path
+                  className="xp-clippy-shade"
+                  d="M96 34c23 0 42 17 42 39 0 14-7 26-18 33v72c0 12-10 22-22 22s-22-10-22-22V93c0-12 10-21 22-21s22 9 22 21v66"
+                />
+                <g className="xp-clippy-eyes">
+                  <ellipse className="xp-clippy-eye" cx="58" cy="58" rx="18" ry="12" transform="rotate(-11 58 58)" />
+                  <ellipse className="xp-clippy-eye" cx="123" cy="62" rx="18" ry="12" transform="rotate(11 123 62)" />
+                  <ellipse className="xp-clippy-pupil xp-clippy-pupil--left" cx="60" cy="60" rx="7" ry="5" />
+                  <ellipse className="xp-clippy-pupil xp-clippy-pupil--right" cx="125" cy="64" rx="7" ry="5" />
+                </g>
+                <path className="xp-clippy-brow" d="M34 42h34" />
+                <path className="xp-clippy-brow" d="M111 46h34" />
+              </g>
+            </svg>
           </div>
         </button>
         {dogBubbleOpen && (
           <div className="xp-dog-bubble" role="status" aria-live="polite">
-            {dogCustomMessage || DOG_MESSAGES[dogMessageIndex]}
+            {dogCustomMessage || CLIPPY_MESSAGES[dogMessageIndex]}
           </div>
         )}
       </section>

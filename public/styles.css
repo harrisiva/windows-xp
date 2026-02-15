@@ -129,13 +129,15 @@ body,
 }
 
 .xp-dog {
-  position: absolute;
-  right: 18px;
-  bottom: 50px;
-  z-index: 25;
+  position: fixed;
+  right: 14px;
+  bottom: 54px;
+  z-index: 120;
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
 }
 
 .desktop-gemini-status {
@@ -158,181 +160,147 @@ body,
   background: transparent;
   padding: 0;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .xp-dog-sprite {
   position: relative;
-  width: 96px;
-  height: 86px;
+  width: clamp(86px, 10vw, 114px);
+  height: clamp(118px, 14vw, 156px);
   transform-origin: 50% 100%;
-  animation: dog-float 2.3s ease-in-out infinite;
+  animation: clippy-float 2.4s ease-in-out infinite;
 }
 
-.xp-dog-head {
-  position: absolute;
-  left: 28px;
-  top: 6px;
-  width: 42px;
-  height: 34px;
-  border-radius: 52% 52% 46% 46%;
-  background: linear-gradient(180deg, #f6d8aa 0%, #e9be86 100%);
-  border: 1px solid #9f7544;
-  box-shadow: inset 0 -4px 0 rgba(140, 90, 42, 0.12);
+.xp-clippy-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  filter: none;
+  opacity: 1;
 }
 
-.xp-dog-ear {
-  position: absolute;
-  top: 3px;
-  width: 15px;
-  height: 25px;
-  border-radius: 65% 65% 48% 48%;
-  background: linear-gradient(180deg, #b1773c 0%, #805122 100%);
-  border: 1px solid #6c411a;
+.xp-clippy-body {
+  fill: none;
+  stroke: #050608;
+  stroke-width: 14;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
 }
 
-.xp-dog-ear--left {
-  left: 21px;
-  transform: rotate(15deg);
+.xp-clippy-shade {
+  fill: none;
+  stroke: #b7c7d8;
+  stroke-width: 9;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
 }
 
-.xp-dog-ear--right {
-  right: 21px;
-  transform: rotate(-15deg);
+.xp-clippy-eye {
+  fill: #ffffff;
+  stroke: #050608;
+  stroke-width: 3;
 }
 
-.xp-dog-eye {
-  position: absolute;
-  top: 13px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #2d1a0f;
-  animation: dog-blink 4.2s infinite;
+.xp-clippy-pupil {
+  fill: #050608;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: clippy-look-around 4.8s ease-in-out infinite;
 }
 
-.xp-dog-eye--left {
-  left: 12px;
+.xp-clippy-pupil--right {
+  animation-delay: 120ms;
 }
 
-.xp-dog-eye--right {
-  right: 12px;
+.xp-clippy-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: clippy-eyes-blink 5s infinite;
 }
 
-.xp-dog-nose {
-  position: absolute;
-  left: 18px;
-  top: 20px;
-  width: 6px;
-  height: 5px;
-  border-radius: 50%;
-  background: #3f2515;
-}
-
-.xp-dog-body {
-  position: absolute;
-  left: 20px;
-  top: 34px;
-  width: 55px;
-  height: 40px;
-  border-radius: 52% 45% 42% 42%;
-  background: linear-gradient(180deg, #f0c892 0%, #d79d61 100%);
-  border: 1px solid #906036;
-}
-
-.xp-dog-paw {
-  position: absolute;
-  bottom: 2px;
-  width: 16px;
-  height: 14px;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #e8bd85 0%, #cb8f4f 100%);
-  border: 1px solid #8f5c30;
-}
-
-.xp-dog-paw--left {
-  left: 26px;
-}
-
-.xp-dog-paw--right {
-  left: 46px;
-}
-
-.xp-dog-tail {
-  position: absolute;
-  right: 14px;
-  top: 46px;
-  width: 20px;
-  height: 6px;
-  border-radius: 7px;
-  background: #aa713d;
-  border: 1px solid #7a4d25;
-  transform-origin: 0 50%;
-  animation: dog-tail 0.65s ease-in-out infinite;
+.xp-clippy-brow {
+  stroke: #050608;
+  stroke-width: 5;
+  stroke-linecap: square;
+  fill: none;
 }
 
 .xp-dog-bubble {
-  width: min(240px, 42vw);
-  min-height: 64px;
-  padding: 11px 12px;
-  border: 1px solid #8f7d2e;
-  border-radius: 10px;
-  background: linear-gradient(180deg, #fff9ca 0%, #f3e89a 100%);
-  color: #3a3321;
-  font-size: 12px;
-  line-height: 1.35;
-  box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.3);
+  width: clamp(190px, 26vw, 300px);
+  min-height: 56px;
+  padding: 10px 12px;
+  border: 1px solid #7e8c99;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #f8fcff 0%, #e8f0f6 100%);
+  color: #233345;
+  font-size: clamp(11px, 1vw, 13px);
+  line-height: 1.4;
+  box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.22);
   position: relative;
   animation: dog-bubble-in 150ms ease-out;
+  pointer-events: auto;
+  align-self: center;
 }
 
 .xp-dog-bubble::after {
   content: "";
   position: absolute;
   right: -8px;
-  bottom: 11px;
+  top: 50%;
   width: 14px;
   height: 14px;
-  background: #f5eb9f;
-  border-right: 1px solid #8f7d2e;
-  border-bottom: 1px solid #8f7d2e;
-  transform: rotate(-45deg);
+  background: #eaf2f8;
+  border-right: 1px solid #7e8c99;
+  border-bottom: 1px solid #7e8c99;
+  transform: translateY(-50%) rotate(-45deg);
 }
 
-@keyframes dog-float {
+@keyframes clippy-float {
   0% {
-    transform: translateY(0);
+    transform: translateY(0) rotate(-1.2deg);
   }
   50% {
-    transform: translateY(-4px);
+    transform: translateY(-5px) rotate(1.2deg);
   }
   100% {
-    transform: translateY(0);
+    transform: translateY(0) rotate(-1.2deg);
   }
 }
 
-@keyframes dog-tail {
-  0% {
-    transform: rotate(14deg);
-  }
-  50% {
-    transform: rotate(-16deg);
-  }
-  100% {
-    transform: rotate(14deg);
-  }
-}
-
-@keyframes dog-blink {
+@keyframes clippy-eyes-blink {
   0%,
-  45%,
-  47%,
-  92%,
+  10%,
+  46%,
+  48%,
+  85%,
+  87%,
   100% {
     transform: scaleY(1);
   }
-  46%,
-  93% {
-    transform: scaleY(0.16);
+  47%,
+  86% {
+    transform: scaleY(0.09);
+  }
+}
+
+@keyframes clippy-look-around {
+  0%,
+  16%,
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+  28% {
+    transform: translateX(-2px) translateY(-1px);
+  }
+  42% {
+    transform: translateX(2px) translateY(0);
+  }
+  58% {
+    transform: translateX(1px) translateY(1px);
+  }
+  74% {
+    transform: translateX(-1px) translateY(0);
   }
 }
 
