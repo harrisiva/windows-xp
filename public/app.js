@@ -784,6 +784,7 @@ function App() {
   const [notepadPos, setNotepadPos] = useState({ x: 220, y: 110 });
   const [notepadSize, setNotepadSize] = useState({ width: 620, height: 440 });
   const [cmdPos, setCmdPos] = useState({ x: 130, y: 84 });
+  const [cmdSize, setCmdSize] = useState({ width: 920, height: 520 });
   const [geminiPos, setGeminiPos] = useState({ x: 280, y: 138 });
   const [pinballPos, setPinballPos] = useState({ x: 200, y: 86 });
   const [pinballSize, setPinballSize] = useState(() => {
@@ -807,6 +808,7 @@ function App() {
   const [geminiStatus, setGeminiStatus] = useState("inactive");
   const [geminiStatusMessage, setGeminiStatusMessage] = useState("No API key validated yet.");
   const [cmdInput, setCmdInput] = useState("");
+  const [cmdFontSize, setCmdFontSize] = useState(14);
   const [cmdBusy, setCmdBusy] = useState(false);
   const [cmdLines, setCmdLines] = useState([
     { kind: "system", text: "Microsoft Windows XP [Version 5.1.2600]" },
@@ -1016,6 +1018,21 @@ function App() {
       };
     }
 
+    function clampCmdSizeToViewport(width, height, x, y) {
+      const margin = 12;
+      const minWidth = 520;
+      const minHeight = 300;
+      const cmdRect = cmdRef.current?.getBoundingClientRect();
+      const left = x ?? cmdRect?.left ?? 130;
+      const top = y ?? cmdRect?.top ?? 84;
+      const maxWidth = Math.max(minWidth, window.innerWidth - left - margin);
+      const maxHeight = Math.max(minHeight, window.innerHeight - TASKBAR_HEIGHT - top - margin);
+      return {
+        width: Math.min(Math.max(minWidth, width), maxWidth),
+        height: Math.min(Math.max(minHeight, height), maxHeight),
+      };
+    }
+
     function clampGeminiToViewport(x, y, width, height) {
       const margin = 12;
       const geminiWidth = width || geminiRef.current?.offsetWidth || 540;
@@ -1127,6 +1144,14 @@ function App() {
         setNotepadSize(clampNotepadSizeToViewport(nextWidth, nextHeight));
       }
 
+      if (dragState.current.target === "cmd-resize") {
+        const deltaX = event.clientX - dragState.current.startX;
+        const deltaY = event.clientY - dragState.current.startY;
+        const nextWidth = dragState.current.startWidth + deltaX;
+        const nextHeight = dragState.current.startHeight + deltaY;
+        setCmdSize(clampCmdSizeToViewport(nextWidth, nextHeight));
+      }
+
       if (dragState.current.target === "icon") {
         const desktopRect = desktopRef.current?.getBoundingClientRect();
         if (!desktopRect || !dragState.current.id) {
@@ -1158,6 +1183,7 @@ function App() {
       setExplorerPos((prev) => clampExplorerToViewport(prev.x, prev.y));
       setNotepadSize((prev) => clampNotepadSizeToViewport(prev.width, prev.height));
       setNotepadPos((prev) => clampNotepadToViewport(prev.x, prev.y));
+      setCmdSize((prev) => clampCmdSizeToViewport(prev.width, prev.height));
       setCmdPos((prev) => clampCmdToViewport(prev.x, prev.y));
       setGeminiPos((prev) => clampGeminiToViewport(prev.x, prev.y));
       const nextPinballSize = getResponsivePinballSize();
@@ -1341,6 +1367,10 @@ function App() {
     setReadmeFontSize((prev) => Math.min(28, Math.max(10, prev + delta)));
   }
 
+  function changeCmdFontSize(delta) {
+    setCmdFontSize((prev) => Math.min(26, Math.max(11, prev + delta)));
+  }
+
   function onDeleteIconClick() {
     if (!menu.targetId) {
       return;
@@ -1443,6 +1473,22 @@ function App() {
       id: null,
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
+    };
+    document.body.classList.add("is-dragging");
+  }
+
+  function onCmdResizePointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    dragState.current = {
+      target: "cmd-resize",
+      id: null,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: cmdSize.width,
+      startHeight: cmdSize.height,
     };
     document.body.classList.add("is-dragging");
   }
@@ -1966,19 +2012,29 @@ function App() {
         <section
           ref={cmdRef}
           className="cmd-window"
-          style={{ left: cmdPos.x, top: cmdPos.y, zIndex: getWindowZ("cmd") }}
+          style={{
+            left: cmdPos.x,
+            top: cmdPos.y,
+            width: cmdSize.width,
+            height: cmdSize.height,
+            zIndex: getWindowZ("cmd"),
+          }}
           onPointerDown={() => bringWindowToFront("cmd")}
           role="dialog"
           aria-label="Command Prompt"
         >
           <div className="window-header cmd-header" onPointerDown={onCmdHeaderPointerDown}>
             <span className="window-title">C:\WINDOWS\system32\cmd.exe</span>
-            <button className="close-btn" onClick={closeCmd} aria-label="Close Command Prompt">
-              ×
-            </button>
+            <div className="window-actions">
+              <button className="toolbar-btn" type="button" onClick={() => changeCmdFontSize(-1)}>A-</button>
+              <button className="toolbar-btn" type="button" onClick={() => changeCmdFontSize(1)}>A+</button>
+              <button className="close-btn" onClick={closeCmd} aria-label="Close Command Prompt">
+                ×
+              </button>
+            </div>
           </div>
           <div className="cmd-body">
-            <div className="cmd-output" ref={cmdOutputRef}>
+            <div className="cmd-output" ref={cmdOutputRef} style={{ fontSize: `${cmdFontSize}px` }}>
               {cmdLines.map((line, index) => (
                 <div key={`cmd-line-${index}`} className={`cmd-line cmd-line--${line.kind}`}>
                   {line.text}
@@ -1988,6 +2044,7 @@ function App() {
             </div>
             <form
               className="cmd-input-row"
+              style={{ fontSize: `${cmdFontSize}px` }}
               onSubmit={(event) => {
                 event.preventDefault();
                 void submitCmd();
@@ -2005,6 +2062,11 @@ function App() {
               />
             </form>
           </div>
+          <div
+            className="cmd-resize-handle"
+            onPointerDown={onCmdResizePointerDown}
+            aria-hidden="true"
+          />
         </section>
       )}
 
