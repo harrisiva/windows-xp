@@ -1,3 +1,4 @@
+// Desktop icon seeds used for initial layout pass at startup/refresh.
 const DEFAULT_ICONS = [
   { id: "computer", label: "My Computer", type: "computer" },
   { id: "recycle", label: "Recycle Bin", type: "recycle-shortcut" },
@@ -8,6 +9,7 @@ const DEFAULT_ICONS = [
   { id: "tetris", label: "Tetris", type: "tetris-app" },
 ];
 
+// Rotating helper lines for Clippy bubble when no custom error is active.
 const CLIPPY_MESSAGES = [
   "It looks like you're building an XP desktop.",
   "Tip: Double-click desktop icons to open them.",

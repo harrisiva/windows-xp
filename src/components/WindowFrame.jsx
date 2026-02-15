@@ -1,5 +1,9 @@
 import { forwardRef } from "react";
 
+/**
+ * Shared window chrome primitive for XP-style app windows.
+ * Keeps header/title/actions/close behavior consistent across apps.
+ */
 const WindowFrame = forwardRef(function WindowFrame(
   {
     className,

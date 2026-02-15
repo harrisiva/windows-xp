@@ -1,6 +1,9 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+
+// Gemini SDK is optional at startup so the app can boot even if dependency
+// is missing in fresh environments. API handlers return clear guidance.
 let GoogleGenAI;
 try {
   ({ GoogleGenAI } = require("@google/genai"));
@@ -52,6 +55,7 @@ app.post("/api/validate-gemini-key", async (req, res) => {
   }
 
   const timeoutMs = 7000;
+  // Protect UI from hanging forever on upstream/provider latency.
   const timeoutPromise = new Promise((_, reject) => {
     setTimeout(() => reject(new Error("Gemini connection timed out. Please try again.")), timeoutMs);
   });
@@ -59,6 +63,7 @@ app.post("/api/validate-gemini-key", async (req, res) => {
   try {
     const ai = new GoogleGenAI({ apiKey });
 
+    // Tries multiple call shapes to stay compatible across SDK revisions.
     async function verifyModelAccess() {
       if (!ai?.models?.list || typeof ai.models.list !== "function") {
         throw new Error("Gemini SDK missing models.list()");
@@ -74,6 +79,7 @@ app.post("/api/validate-gemini-key", async (req, res) => {
       for (const call of callVariants) {
         try {
           const result = await call();
+          // Some versions return async iterables, others return plain objects.
           if (result && typeof result[Symbol.asyncIterator] === "function") {
             for await (const _model of result) {
               break;
@@ -153,6 +159,7 @@ app.post("/api/cmd-gemini", async (req, res) => {
       contents: prompt,
     });
 
+    // Normalize response payloads across SDK result variants.
     let text = "";
     if (typeof result?.text === "function") {
       text = result.text();
@@ -182,6 +189,7 @@ app.get("*", (req, res) => {
   if (fs.existsSync(distIndexPath)) {
     return res.sendFile(distIndexPath);
   }
+  // Helpful fallback for production startup without a frontend build.
   return res.status(404).send("Frontend build not found. Run `npm run dev` or `npm run build`.");
 });
 

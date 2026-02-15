@@ -5,6 +5,8 @@ import {
   START_MENU_RIGHT_ITEMS,
 } from "../constants/ui";
 
+// Icon renderer is intentionally centralized so icon styles stay consistent
+// between desktop items and any future icon mirrors (taskbar/start menu).
 function IconGraphic({ type }) {
   if (type === "computer") {
     return (
@@ -112,6 +114,7 @@ export function DesktopGeminiStatusWidget({
   onPointerDown,
   onRefresh,
 }) {
+  // Uses right-click and button-click refresh behaviors provided by App.
   return (
     <section
       ref={statusRef}
@@ -144,6 +147,7 @@ export function DesktopIcons({ icons, onIconPointerDown, onIconRightClick, iconD
   return (
     <>
       {icons.map((icon) => (
+        // Double-click opens app; pointer down participates in drag interactions.
         <div
           key={icon.id}
           className={`icon ${icon.type.endsWith("shortcut") ? "icon--shortcut" : ""}`}
@@ -169,6 +173,7 @@ export function DesktopIcons({ icons, onIconPointerDown, onIconRightClick, iconD
 
 export function ClippyAssistant({ zIndex, bubbleOpen, customMessage, messageIndex, onToggle }) {
   return (
+    // Assistant intentionally sits outside taskbar so it can float near desktop icons.
     <section className="xp-dog" aria-label="Desktop assistant" style={{ zIndex }}>
       <button type="button" className="xp-dog-btn" onClick={onToggle} aria-label="Toggle assistant bubble">
         <div className="xp-dog-sprite" aria-hidden="true">
@@ -209,6 +214,7 @@ export function IconContextMenu({ menu, onPropertiesClick, onDeleteIconClick }) 
   }
 
   return (
+    // Context actions are intentionally minimal to match current desktop feature scope.
     <div className="context-menu" style={{ left: menu.x, top: menu.y }}>
       {menu.targetId === "computer" && (
         <button className="context-item" onClick={onPropertiesClick}>
@@ -230,6 +236,7 @@ export function StartMenu({ isOpen, actions }) {
   }
 
   return (
+    // Static menu composition is driven by constants in `constants/ui`.
     <section className="start-menu" role="dialog" aria-label="Start menu" onClick={(event) => event.stopPropagation()}>
       <div className="start-menu-top">
         <div className="start-avatar" />
@@ -282,6 +289,7 @@ export function Taskbar({ openTaskbarItems, onStartButtonClick, onTaskbarWindowC
       <div className="taskbar-segment">
         <div className="taskbar-windows">
           {openTaskbarItems.map((item) => (
+            // Clicking a taskbar item promotes that window in z-order.
             <button
               key={item.id}
               type="button"

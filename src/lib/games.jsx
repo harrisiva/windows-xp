@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
+/**
+ * Canvas-based pinball mini-game with lightweight physics.
+ */
 function PinballGame({ isOpen }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(0);
@@ -21,6 +24,7 @@ function PinballGame({ isOpen }) {
   }
 
   function resetGame() {
+    // Static table geometry and dynamic entities are recreated per new game.
     const next = {
       table: { w: 620, h: 420 },
       ball: null,
@@ -71,6 +75,7 @@ function PinballGame({ isOpen }) {
     resetGame();
 
     function onKeyDown(event) {
+      // Input state is captured in refs so render frequency is not tied to key repeat.
       if (event.key === "ArrowLeft") {
         keysRef.current.left = true;
       }
@@ -110,6 +115,7 @@ function PinballGame({ isOpen }) {
     }
 
     function collidePaddle(ball, paddleX, paddleY, width, isLeft) {
+      // Paddle impact angle is based on hit position relative to paddle center.
       const paddleTop = paddleY;
       const paddleBottom = paddleY + 14;
       if (
@@ -138,12 +144,14 @@ function PinballGame({ isOpen }) {
       const activeLeftY = keysRef.current.left ? 348 : 362;
       const activeRightY = keysRef.current.right ? 348 : 362;
 
+      // Gravity only applies after launch.
       if (ball.launched) {
         ball.vy += 0.2;
       }
 
       ball.vx *= 0.999;
       ball.vy *= 0.999;
+      // Integrate one frame of motion after forces/drag are applied.
       ball.x += ball.vx;
       ball.y += ball.vy;
 
@@ -160,6 +168,7 @@ function PinballGame({ isOpen }) {
         ball.vy = Math.abs(ball.vy) * 0.97;
       }
 
+      // Circular bumper collisions reflect velocity and award score.
       bumpers.forEach((bumper) => {
         if (bumper.cool > 0) {
           bumper.cool -= 1;
@@ -183,6 +192,7 @@ function PinballGame({ isOpen }) {
         }
       });
 
+      // Targets can be hit repeatedly with a small cooldown window.
       targets.forEach((target) => {
         if (target.hit > 0) {
           target.hit -= 1;
@@ -221,7 +231,9 @@ function PinballGame({ isOpen }) {
       collidePaddle(ball, leftPaddle.x, activeLeftY, leftPaddle.w, true);
       collidePaddle(ball, rightPaddle.x, activeRightY, rightPaddle.w, false);
 
+      // Ball drain: lose life and reset or restart on game over.
       if (ball.y - ball.r > table.h + 30) {
+        // Life bookkeeping is kept in React state so toolbar UI stays in sync.
         setLives((prev) => {
           const nextLives = prev - 1;
           if (nextLives <= 0) {
@@ -236,6 +248,7 @@ function PinballGame({ isOpen }) {
       }
 
       ctx.clearRect(0, 0, table.w, table.h);
+      // Rendering section: table, lanes, bumpers, slings, paddles and ball.
       const frame = ctx.createLinearGradient(0, 0, 0, table.h);
       frame.addColorStop(0, "#0a2f72");
       frame.addColorStop(1, "#031430");
@@ -347,6 +360,7 @@ function PinballGame({ isOpen }) {
       ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
       ctx.fill();
 
+      // Keep loop alive until component closes/unmounts.
       rafRef.current = requestAnimationFrame(animate);
     }
 
@@ -376,6 +390,9 @@ function PinballGame({ isOpen }) {
   );
 }
 
+/**
+ * Canvas-based tetris implementation with keyboard controls and scoring.
+ */
 function TetrisGame({ isOpen }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(0);
@@ -462,6 +479,7 @@ function TetrisGame({ isOpen }) {
   function spawnPiece(state) {
     state.piece = state.next;
     state.next = randomPiece();
+    // Center spawn by piece width for predictable entry position.
     state.pieceX = Math.floor((10 - state.piece.shape[0].length) / 2);
     state.pieceY = -1;
     if (collides(state.board, state.piece, state.pieceX, state.pieceY + 1)) {
@@ -471,6 +489,7 @@ function TetrisGame({ isOpen }) {
   }
 
   function resetGame() {
+    // Mutable state lives in a ref to keep animation-frame updates efficient.
     stateRef.current = {
       board: emptyBoard(),
       piece: null,
@@ -498,6 +517,7 @@ function TetrisGame({ isOpen }) {
   }
 
   function lockAndAdvance(state) {
+    // Once a piece locks, clear lines, update pacing, then spawn the next piece.
     mergePiece(state.board, state.piece, state.pieceX, state.pieceY);
     const cleared = clearLines(state.board);
     if (cleared > 0) {
@@ -549,6 +569,7 @@ function TetrisGame({ isOpen }) {
           state.piece = candidate;
         }
       } else if (event.code === "Space") {
+        // Hard drop commits instantly for arcade-like pace.
         event.preventDefault();
         hardDrop(state);
         lockAndAdvance(state);
@@ -584,6 +605,7 @@ function TetrisGame({ isOpen }) {
 
       const delta = time - state.lastTime;
       state.lastTime = time;
+      // Piece drop cadence depends on level-driven interval.
       if (!state.gameOver) {
         state.dropAccumulator += delta;
         if (state.dropAccumulator >= state.dropInterval) {
@@ -618,6 +640,7 @@ function TetrisGame({ isOpen }) {
         ctx.stroke();
       }
 
+      // Draw locked board cells.
       state.board.forEach((row, y) => {
         row.forEach((color, x) => {
           if (color) {
@@ -626,6 +649,7 @@ function TetrisGame({ isOpen }) {
         });
       });
 
+      // Draw active falling piece.
       if (state.piece) {
         state.piece.shape.forEach((row, py) => {
           row.forEach((value, px) => {
@@ -651,6 +675,7 @@ function TetrisGame({ isOpen }) {
       ctx.fillText(String(level), 220, 306);
 
       if (state.next) {
+        // Side panel preview uses smaller cells to fit narrow HUD column.
         const nx = 224;
         const ny = 52;
         const nCell = 14;

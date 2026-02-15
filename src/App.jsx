@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { PinballGame, TetrisGame } from "./lib/games";
 import { DEFAULT_ICONS, CLIPPY_MESSAGES } from "./lib/config";
 import { calculateResponsivePinballSize, formatGeminiOutputForCmd } from "./lib/utils";
-import WindowFrame from "./components/WindowFrame";
+import { fetchSiteInfo, queryGeminiFromCmd, validateGeminiKey } from "./lib/api";
 import {
   DesktopGeminiStatusWidget,
   DesktopIcons,
@@ -12,12 +12,25 @@ import {
   Taskbar,
 } from "./components/DesktopShell";
 import {
+  CmdWindow,
+  ExplorerWindow,
+  GeminiKeyWindow,
+  NotepadWindow,
+  PinballWindow,
+  PropertiesWindow,
+  TetrisWindow,
+} from "./components/windows";
+import {
   APP_STORAGE_KEYS,
   DESKTOP_LAYOUT,
   WINDOW_IDS,
   CLIPPY_TOP_WINDOW_IDS,
 } from "./constants/ui";
 
+/**
+ * Root desktop orchestrator.
+ * Owns global state, drag/resize interactions, and cross-window coordination.
+ */
 function App() {
   const GEMINI_KEY_GLOBAL = APP_STORAGE_KEYS.GEMINI_SESSION_KEY;
   const {
@@ -27,6 +40,7 @@ function App() {
     ICON_GAP,
     DESKTOP_PADDING,
   } = DESKTOP_LAYOUT;
+  // Core desktop shell state.
   const [menu, setMenu] = useState({ visible: false, x: 0, y: 0, targetId: null });
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const [siteInfo, setSiteInfo] = useState(null);
@@ -48,6 +62,7 @@ function App() {
   const [dogBubbleOpen, setDogBubbleOpen] = useState(false);
   const [dogMessageIndex, setDogMessageIndex] = useState(0);
   const [dogCustomMessage, setDogCustomMessage] = useState("");
+  // Per-window state (open flags, position, size, content).
   const [readmeContent, setReadmeContent] = useState(
     "Welcome to this Windows XP desktop web app.\n\nYou can edit this file. Changes stay until you refresh the page."
   );
@@ -104,6 +119,7 @@ function App() {
   const [error, setError] = useState("");
   const [windowPos, setWindowPos] = useState({ x: 120, y: 120 });
   const [icons, setIcons] = useState(() => DEFAULT_ICONS.map((icon, index) => ({ ...icon, x: 28, y: 36 + index * 110 })));
+  // Mutable drag state avoids re-renders while pointer moves.
   const dragState = useRef({ target: null, id: null, offsetX: 0, offsetY: 0 });
   const desktopRef = useRef(null);
   const windowRef = useRef(null);
@@ -116,6 +132,7 @@ function App() {
   const pinballRef = useRef(null);
   const tetrisRef = useRef(null);
 
+  /** Reads viewport and computes best-fit pinball window dimensions. */
   function getResponsivePinballSize() {
     return calculateResponsivePinballSize(window.innerWidth, window.innerHeight, TASKBAR_HEIGHT);
   }
@@ -129,14 +146,19 @@ function App() {
     };
   }
 
+  /** Promotes a window id to the top of the z-order stack. */
   function bringWindowToFront(windowId) {
     setWindowStack((prev) => [...prev.filter((id) => id !== windowId), windowId]);
   }
 
+  /** Converts stack ordering into concrete z-index values. */
   function getWindowZ(windowId) {
     return 30 + windowStack.indexOf(windowId);
   }
 
+  /**
+   * Updates top-right status chip by validating Gemini API key against backend.
+   */
   async function pingGeminiStatus(apiKey) {
     if (!apiKey) {
       setGeminiStatus("inactive");
@@ -148,14 +170,8 @@ function App() {
     setGeminiStatusMessage("Pinging Gemini...");
 
     try {
-      const response = await fetch("/api/validate-gemini-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey }),
-      });
-
-      const payload = await response.json();
-      if (response.ok && payload?.ok) {
+      const { ok, payload } = await validateGeminiKey(apiKey);
+      if (ok) {
         setGeminiStatus("active");
         setGeminiStatusMessage(payload.message || "Connected to Gemini API.");
         return;
@@ -169,12 +185,14 @@ function App() {
     }
   }
 
+  // Keep session key mirrored on window for compatibility with existing flows.
   useEffect(() => {
     if (typeof window !== "undefined") {
       window[GEMINI_KEY_GLOBAL] = geminiApiKey;
     }
   }, [geminiApiKey]);
 
+  // Auto-scroll command output as new lines arrive.
   useEffect(() => {
     if (!cmdOpen) {
       return;
@@ -185,6 +203,7 @@ function App() {
     }
   }, [cmdLines, cmdOpen]);
 
+  // Ensure status widget starts in the top-right corner after first layout.
   useEffect(() => {
     const margin = 6;
     const top = 10;
@@ -193,6 +212,7 @@ function App() {
     setDesktopGeminiPos({ x: nextX, y: top });
   }, []);
 
+  // Clicking outside menus should close context + start menu overlays.
   useEffect(() => {
     function closeMenu() {
       setMenu((prev) => ({ ...prev, visible: false, targetId: null }));
@@ -203,12 +223,15 @@ function App() {
     return () => window.removeEventListener("click", closeMenu);
   }, []);
 
+  /** Toggles start menu and prevents desktop-level click handlers from firing. */
   function onStartButtonClick(event) {
     event.stopPropagation();
     setStartMenuOpen((prev) => !prev);
   }
 
+  // Global pointer/resize listeners for drag, resize, and viewport clamping.
   useEffect(() => {
+    // Reflow desktop icons into a clean column-first grid on initial mount and refresh.
     function arrangeIcons(iconItems) {
       const desktop = desktopRef.current;
       if (!desktop) {
@@ -249,6 +272,7 @@ function App() {
     }
 
     function clampExplorerToViewport(x, y, width, height) {
+      // Keep explorer fully visible, accounting for taskbar occupancy at the bottom.
       const margin = 12;
       const explorerWidth = width || explorerRef.current?.offsetWidth || 640;
       const explorerHeight = height || explorerRef.current?.offsetHeight || 430;
@@ -260,6 +284,7 @@ function App() {
     }
 
     function clampExplorerSizeToViewport(width, height, x, y) {
+      // Resizing is bounded both by minimum usable sizes and remaining viewport space.
       const margin = 12;
       const minWidth = 420;
       const minHeight = 280;
@@ -286,6 +311,7 @@ function App() {
     }
 
     function clampNotepadSizeToViewport(width, height, x, y) {
+      // Prevent text editor from shrinking below a readable authoring size.
       const margin = 12;
       const minWidth = 420;
       const minHeight = 260;
@@ -312,6 +338,7 @@ function App() {
     }
 
     function clampCmdSizeToViewport(width, height, x, y) {
+      // CMD keeps larger minimums so prompt/output remain legible.
       const margin = 12;
       const minWidth = 520;
       const minHeight = 300;
@@ -360,6 +387,7 @@ function App() {
     }
 
     function clampDesktopGeminiToViewport(x, y, width, height) {
+      // Status chip has tighter margins so it can sit close to screen corners.
       const margin = 6;
       const chipWidth = width || desktopGeminiRef.current?.offsetWidth || 170;
       const chipHeight = height || desktopGeminiRef.current?.offsetHeight || 32;
@@ -387,6 +415,7 @@ function App() {
     }
 
     function onPointerMove(event) {
+      // Single pointer-move loop routes updates by drag target type.
       if (!dragState.current.target) {
         return;
       }
@@ -440,6 +469,7 @@ function App() {
       }
 
       if (dragState.current.target === "explorer-resize") {
+        // Resize operations use deltas from drag start to avoid cumulative drift.
         const deltaX = event.clientX - dragState.current.startX;
         const deltaY = event.clientY - dragState.current.startY;
         const nextWidth = dragState.current.startWidth + deltaX;
@@ -464,6 +494,7 @@ function App() {
       }
 
       if (dragState.current.target === "icon") {
+        // Icon drag operates in desktop-local coordinates, then clamps to grid bounds.
         const desktopRect = desktopRef.current?.getBoundingClientRect();
         if (!desktopRect || !dragState.current.id) {
           return;
@@ -483,12 +514,14 @@ function App() {
     }
 
     function onPointerUp() {
+      // End any active drag/resize gesture and restore default cursor behavior.
       dragState.current.target = null;
       dragState.current.id = null;
       document.body.classList.remove("is-dragging");
     }
 
     function onResize() {
+      // Re-clamp all movable/resizable surfaces when viewport dimensions change.
       setWindowPos((prev) => clampToViewport(prev.x, prev.y));
       setExplorerSize((prev) => clampExplorerSizeToViewport(prev.width, prev.height));
       setExplorerPos((prev) => clampExplorerToViewport(prev.x, prev.y));
@@ -521,6 +554,9 @@ function App() {
     setMenu({ visible: true, x: event.clientX, y: event.clientY, targetId: iconId });
   }
 
+  /**
+   * Loads and opens My Computer properties content from backend API.
+   */
   async function onPropertiesClick() {
     setMenu((prev) => ({ ...prev, visible: false }));
     setError("");
@@ -528,11 +564,7 @@ function App() {
     bringWindowToFront("properties");
 
     try {
-      const response = await fetch("/api/site-info");
-      if (!response.ok) {
-        throw new Error("Could not load properties.");
-      }
-      const data = await response.json();
+      const data = await fetchSiteInfo();
       setSiteInfo(data);
     } catch (err) {
       setError(err.message || "Something went wrong.");
@@ -573,6 +605,9 @@ function App() {
     setCmdOpen(false);
   }
 
+  /**
+   * Sends command prompt input to Gemini, then appends response lines.
+   */
   async function submitCmd() {
     const prompt = cmdInput.trim();
     if (!prompt || cmdBusy) {
@@ -593,13 +628,8 @@ function App() {
     }
 
     try {
-      const response = await fetch("/api/cmd-gemini", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: geminiApiKey.trim(), prompt }),
-      });
-      const payload = await response.json();
-      if (!response.ok || !payload?.ok) {
+      const { ok, payload } = await queryGeminiFromCmd({ apiKey: geminiApiKey.trim(), prompt });
+      if (!ok) {
         throw new Error(payload?.message || "Gemini request failed.");
       }
       setCmdLines((prev) => [
@@ -614,6 +644,7 @@ function App() {
   }
 
   function openGeminiKey() {
+    // Copy saved key into draft so users can view/edit current session value.
     bringWindowToFront("gemini");
     setGeminiDraft(geminiApiKey);
     setDogCustomMessage("");
@@ -638,6 +669,7 @@ function App() {
   }
 
   function openPinball() {
+    // Pinball re-centers each open so fixed-aspect gameplay stays fully visible.
     const nextPinballSize = getResponsivePinballSize();
     const centeredX = Math.floor((window.innerWidth - nextPinballSize.width) / 2);
     const centeredY = Math.max(12, Math.floor((window.innerHeight - TASKBAR_HEIGHT - nextPinballSize.height) / 2));
@@ -695,232 +727,99 @@ function App() {
     setMenu({ visible: false, x: 0, y: 0, targetId: null });
   }
 
-  function onWindowHeaderPointerDown(event) {
+  /**
+   * Centralized drag start helper used by all draggable windows/widgets/icons.
+   */
+  function beginDrag(nextDragState) {
+    dragState.current = nextDragState;
+    document.body.classList.add("is-dragging");
+  }
+
+  /**
+   * Begins moving a window by its header bar.
+   */
+  function startWindowDrag(event, target, ref) {
     if (event.button !== 0) {
       return;
     }
 
-    if (!windowRef.current) {
+    if (event.target.closest("button")) {
       return;
     }
 
-    const rect = windowRef.current.getBoundingClientRect();
-    dragState.current = {
-      target: "window",
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    beginDrag({
+      target,
       id: null,
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
-    };
-    document.body.classList.add("is-dragging");
+    });
+  }
+
+  /**
+   * Begins resize interactions for windows that expose bottom-right handles.
+   */
+  function startResizeDrag(event, target, startWidth, startHeight) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    beginDrag({
+      target,
+      id: null,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth,
+      startHeight,
+    });
+  }
+
+  function onWindowHeaderPointerDown(event) {
+    startWindowDrag(event, "window", windowRef);
   }
 
   function onExplorerHeaderPointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    if (event.target.closest("button")) {
-      return;
-    }
-
-    const rect = explorerRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    dragState.current = {
-      target: "explorer-window",
-      id: null,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    document.body.classList.add("is-dragging");
+    startWindowDrag(event, "explorer-window", explorerRef);
   }
 
   function onExplorerResizePointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    dragState.current = {
-      target: "explorer-resize",
-      id: null,
-      startX: event.clientX,
-      startY: event.clientY,
-      startWidth: explorerSize.width,
-      startHeight: explorerSize.height,
-    };
-    document.body.classList.add("is-dragging");
+    startResizeDrag(event, "explorer-resize", explorerSize.width, explorerSize.height);
   }
 
   function onNotepadResizePointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    dragState.current = {
-      target: "notepad-resize",
-      id: null,
-      startX: event.clientX,
-      startY: event.clientY,
-      startWidth: notepadSize.width,
-      startHeight: notepadSize.height,
-    };
-    document.body.classList.add("is-dragging");
+    startResizeDrag(event, "notepad-resize", notepadSize.width, notepadSize.height);
   }
 
   function onNotepadHeaderPointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    if (event.target.closest("button")) {
-      return;
-    }
-
-    const rect = notepadRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    dragState.current = {
-      target: "notepad-window",
-      id: null,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    document.body.classList.add("is-dragging");
+    startWindowDrag(event, "notepad-window", notepadRef);
   }
 
   function onCmdResizePointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    dragState.current = {
-      target: "cmd-resize",
-      id: null,
-      startX: event.clientX,
-      startY: event.clientY,
-      startWidth: cmdSize.width,
-      startHeight: cmdSize.height,
-    };
-    document.body.classList.add("is-dragging");
+    startResizeDrag(event, "cmd-resize", cmdSize.width, cmdSize.height);
   }
 
   function onCmdHeaderPointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    if (event.target.closest("button")) {
-      return;
-    }
-
-    const rect = cmdRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    dragState.current = {
-      target: "cmd-window",
-      id: null,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    document.body.classList.add("is-dragging");
+    startWindowDrag(event, "cmd-window", cmdRef);
   }
 
   function onPinballHeaderPointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    if (event.target.closest("button")) {
-      return;
-    }
-
-    const rect = pinballRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    dragState.current = {
-      target: "pinball-window",
-      id: null,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    document.body.classList.add("is-dragging");
+    startWindowDrag(event, "pinball-window", pinballRef);
   }
 
   function onGeminiHeaderPointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    if (event.target.closest("button")) {
-      return;
-    }
-
-    const rect = geminiRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    dragState.current = {
-      target: "gemini-window",
-      id: null,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    document.body.classList.add("is-dragging");
+    startWindowDrag(event, "gemini-window", geminiRef);
   }
 
   function onTetrisHeaderPointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    if (event.target.closest("button")) {
-      return;
-    }
-
-    const rect = tetrisRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    dragState.current = {
-      target: "tetris-window",
-      id: null,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    document.body.classList.add("is-dragging");
+    startWindowDrag(event, "tetris-window", tetrisRef);
   }
 
   function onDesktopGeminiStatusPointerDown(event) {
-    if (event.button !== 0) {
-      return;
-    }
-
-    if (event.target.closest("button")) {
-      return;
-    }
-
-    const rect = desktopGeminiRef.current?.getBoundingClientRect();
-    if (!rect) {
-      return;
-    }
-
-    dragState.current = {
-      target: "desktop-gemini-status",
-      id: null,
-      offsetX: event.clientX - rect.left,
-      offsetY: event.clientY - rect.top,
-    };
-    document.body.classList.add("is-dragging");
+    startWindowDrag(event, "desktop-gemini-status", desktopGeminiRef);
   }
 
   function onIconPointerDown(event, iconId) {
@@ -940,15 +839,16 @@ function App() {
 
     const pointerX = event.clientX - desktopRect.left;
     const pointerY = event.clientY - desktopRect.top;
-    dragState.current = {
+    // Store pointer-to-icon offset so icon does not "jump" under cursor while dragging.
+    beginDrag({
       target: "icon",
       id: iconId,
       offsetX: pointerX - icon.x,
       offsetY: pointerY - icon.y,
-    };
-    document.body.classList.add("is-dragging");
+    });
   }
 
+  // Taskbar list is derived state from each window's open condition.
   const openTaskbarItems = [
     (isLoading || error || siteInfo) && { id: WINDOW_IDS.PROPERTIES, label: "My Computer Properties", kind: WINDOW_IDS.PROPERTIES },
     explorerOpen && { id: WINDOW_IDS.EXPLORER, label: "My Computer", kind: WINDOW_IDS.EXPLORER },
@@ -958,6 +858,7 @@ function App() {
     pinballOpen && { id: WINDOW_IDS.PINBALL, label: "3D Pinball", kind: WINDOW_IDS.PINBALL },
     tetrisOpen && { id: WINDOW_IDS.TETRIS, label: "Tetris", kind: WINDOW_IDS.TETRIS },
   ].filter(Boolean);
+  // Highest visible window drives assistant layering behavior.
   const openWindowIds = new Set(openTaskbarItems.map((item) => item.id));
   const topOpenWindowId = [...windowStack].reverse().find((id) => openWindowIds.has(id)) || null;
   const clippyZIndex = CLIPPY_TOP_WINDOW_IDS.has(topOpenWindowId) ? 90 : 26;
@@ -989,6 +890,7 @@ function App() {
   };
 
   return (
+    // Desktop root hosts floating widgets, draggable icons, app windows, and taskbar.
     <main ref={desktopRef} className="desktop">
       <DesktopGeminiStatusWidget
         statusRef={desktopGeminiRef}
@@ -1016,316 +918,100 @@ function App() {
         onDeleteIconClick={onDeleteIconClick}
       />
 
-      {(isLoading || error || siteInfo) && (
-        <WindowFrame
-          ref={windowRef}
-          className="properties-window"
-          style={{ left: windowPos.x, top: windowPos.y, zIndex: getWindowZ("properties") }}
-          onPointerDown={() => bringWindowToFront("properties")}
-          ariaLabel="Properties window"
-          onHeaderPointerDown={onWindowHeaderPointerDown}
-          title="My Computer Properties"
-          onClose={closeProperties}
-          closeAriaLabel="Close"
-        >
-          <div className="window-body">
-            {isLoading && <p>Loading properties...</p>}
-            {error && <p>{error}</p>}
-            {siteInfo && (
-              <>
-                <div className="row">
-                  <span className="label">Owner:</span>
-                  <span>{siteInfo.owner}</span>
-                </div>
-                <div className="row">
-                  <span className="label">Storage:</span>
-                  <span>{siteInfo.storage}</span>
-                </div>
-                <div className="row">
-                  <span className="label">Additional cool information:</span>
-                  <ul className="list">
-                    {siteInfo.coolInfo.map((item, idx) => (
-                      <li key={`${item}-${idx}`}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="row">
-                  <span className="label">Status:</span>
-                  <span>{siteInfo.uptimeHint}</span>
-                </div>
-              </>
-            )}
-          </div>
-        </WindowFrame>
-      )}
-
-      {explorerOpen && (
-        <WindowFrame
-          ref={explorerRef}
-          className="explorer-window"
-          style={{
-            left: explorerPos.x,
-            top: explorerPos.y,
-            width: explorerSize.width,
-            height: explorerSize.height,
-            zIndex: getWindowZ("explorer"),
-          }}
-          onPointerDown={() => bringWindowToFront("explorer")}
-          ariaLabel="File Explorer"
-          onHeaderPointerDown={onExplorerHeaderPointerDown}
-          title="My Computer"
-          onClose={closeExplorer}
-          closeAriaLabel="Close Explorer"
-          resizeHandle={(
-            <div
-              className="explorer-resize-handle"
-              onPointerDown={onExplorerResizePointerDown}
-              aria-hidden="true"
-            />
-          )}
-        >
-          <div className="explorer-toolbar">
-            <button className="toolbar-btn toolbar-btn--icon" type="button">
-              <span className="tool-icon" aria-hidden="true">
-                🔍
-              </span>
-              <span>Search</span>
-            </button>
-            <button className="toolbar-btn toolbar-btn--icon" type="button">
-              <span className="tool-icon" aria-hidden="true">
-                ⭐
-              </span>
-              <span>Favorites</span>
-            </button>
-            <button className="toolbar-btn toolbar-btn--icon" type="button">
-              <span className="tool-icon" aria-hidden="true">
-                🕘
-              </span>
-              <span>History</span>
-            </button>
-            <button className="toolbar-btn toolbar-btn--icon" type="button">
-              <span className="tool-icon" aria-hidden="true">
-                🌐
-              </span>
-              <span>Channels</span>
-            </button>
-            <button className="toolbar-btn toolbar-btn--icon" type="button">
-              <span className="tool-icon" aria-hidden="true">
-                ⛶
-              </span>
-              <span>Fullscreen</span>
-            </button>
-            <button className="toolbar-btn toolbar-btn--icon" type="button">
-              <span className="tool-icon" aria-hidden="true">
-                ✉️
-              </span>
-              <span>Mail</span>
-            </button>
-          </div>
-          <div className="explorer-body">
-            <aside className="explorer-sidebar">
-              <div className="sidebar-title">Tasks</div>
-              <div className="sidebar-item">System Tasks</div>
-              <div className="sidebar-item">Other Places</div>
-              <div className="sidebar-item">Details</div>
-            </aside>
-            <div className="explorer-content">
-              <div className="explorer-path">C:\</div>
-              <div className="explorer-empty">This folder is empty.</div>
-            </div>
-          </div>
-        </WindowFrame>
-      )}
-
-      {notepadOpen && (
-        <WindowFrame
-          ref={notepadRef}
-          className="notepad-window"
-          style={{
-            left: notepadPos.x,
-            top: notepadPos.y,
-            width: notepadSize.width,
-            height: notepadSize.height,
-            zIndex: getWindowZ("notepad"),
-          }}
-          onPointerDown={() => bringWindowToFront("notepad")}
-          ariaLabel="Notepad"
-          onHeaderPointerDown={onNotepadHeaderPointerDown}
-          title="readme.txt - Notepad"
-          onClose={closeReadme}
-          closeAriaLabel="Close Notepad"
-          resizeHandle={(
-            <div
-              className="notepad-resize-handle"
-              onPointerDown={onNotepadResizePointerDown}
-              aria-hidden="true"
-            />
-          )}
-        >
-          <div className="notepad-toolbar">
-            <button className="toolbar-btn" type="button">File</button>
-            <button className="toolbar-btn" type="button">Edit</button>
-            <button className="toolbar-btn" type="button">Format</button>
-            <button className="toolbar-btn" type="button">View</button>
-            <button className="toolbar-btn" type="button">Help</button>
-            <span className="toolbar-spacer" />
-            <button className="toolbar-btn" type="button" onClick={() => changeReadmeFontSize(-1)}>A-</button>
-            <button className="toolbar-btn" type="button" onClick={() => changeReadmeFontSize(1)}>A+</button>
-          </div>
-          <div className="notepad-body">
-            <textarea
-              className="notepad-editor"
-              value={readmeContent}
-              onChange={(event) => setReadmeContent(event.target.value)}
-              style={{ fontSize: `${readmeFontSize}px` }}
-              spellCheck={false}
-            />
-          </div>
-        </WindowFrame>
-      )}
-
-      {cmdOpen && (
-        <WindowFrame
-          ref={cmdRef}
-          className="cmd-window"
-          style={{
-            left: cmdPos.x,
-            top: cmdPos.y,
-            width: cmdSize.width,
-            height: cmdSize.height,
-            zIndex: getWindowZ("cmd"),
-          }}
-          onPointerDown={() => bringWindowToFront("cmd")}
-          ariaLabel="Command Prompt"
-          headerClassName="window-header cmd-header"
-          onHeaderPointerDown={onCmdHeaderPointerDown}
-          title="C:\\WINDOWS\\system32\\cmd.exe"
-          showDefaultClose={false}
-          headerActions={(
-            <div className="window-actions">
-              <button className="toolbar-btn" type="button" onClick={() => changeCmdFontSize(-1)}>A-</button>
-              <button className="toolbar-btn" type="button" onClick={() => changeCmdFontSize(1)}>A+</button>
-              <button className="close-btn" onClick={closeCmd} aria-label="Close Command Prompt">
-                ×
-              </button>
-            </div>
-          )}
-          resizeHandle={(
-            <div
-              className="cmd-resize-handle"
-              onPointerDown={onCmdResizePointerDown}
-              aria-hidden="true"
-            />
-          )}
-        >
-          <div className="cmd-body">
-            <div className="cmd-output" ref={cmdOutputRef} style={{ fontSize: `${cmdFontSize}px` }}>
-              {cmdLines.map((line, index) => (
-                <div key={`cmd-line-${index}`} className={`cmd-line cmd-line--${line.kind}`}>
-                  {line.text}
-                </div>
-              ))}
-              {cmdBusy && <div className="cmd-line cmd-line--system">Gemini is thinking...</div>}
-            </div>
-            <form
-              className="cmd-input-row"
-              style={{ fontSize: `${cmdFontSize}px` }}
-              onSubmit={(event) => {
-                event.preventDefault();
-                void submitCmd();
-              }}
-            >
-              <span className="cmd-prompt">C:\&gt;</span>
-              <input
-                className="cmd-input"
-                type="text"
-                value={cmdInput}
-                onChange={(event) => setCmdInput(event.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-                disabled={cmdBusy}
-              />
-            </form>
-          </div>
-        </WindowFrame>
-      )}
-
-      {geminiOpen && (
-        <WindowFrame
-          ref={geminiRef}
-          className="gemini-window"
-          style={{ left: geminiPos.x, top: geminiPos.y, zIndex: getWindowZ("gemini") }}
-          onPointerDown={() => bringWindowToFront("gemini")}
-          ariaLabel="Gemini API Key"
-          onHeaderPointerDown={onGeminiHeaderPointerDown}
-          title="Gemini API Key"
-          onClose={closeGeminiKey}
-          closeAriaLabel="Close Gemini API Key"
-        >
-          <div className="window-body">
-            <div className="row">
-              <span className="label">API Key:</span>
-            </div>
-            <input
-              className="gemini-input"
-              type="text"
-              value={geminiDraft}
-              onChange={(event) => setGeminiDraft(event.target.value)}
-              placeholder="Paste your Gemini API key"
-            />
-            <div className="gemini-actions">
-              <button className="toolbar-btn" type="button" onClick={saveGeminiKey}>
-                Save Key
-              </button>
-              <button className="toolbar-btn" type="button" onClick={closeGeminiKey}>
-                Close
-              </button>
-            </div>
-            <div className="gemini-status">
-              <div>Connection: {geminiStatusMessage}</div>
-              <div>Current session key: {geminiApiKey || "(none)"}</div>
-            </div>
-          </div>
-        </WindowFrame>
-      )}
-
-      {pinballOpen && (
-        <WindowFrame
-          ref={pinballRef}
-          className="pinball-window"
-          style={{
-            left: pinballPos.x,
-            top: pinballPos.y,
-            width: pinballSize.width,
-            height: pinballSize.height,
-            zIndex: getWindowZ("pinball"),
-          }}
-          onPointerDown={() => bringWindowToFront("pinball")}
-          ariaLabel="3D Pinball"
-          onHeaderPointerDown={onPinballHeaderPointerDown}
-          title="3D Pinball for Windows - Space Cadet"
-          onClose={closePinball}
-          closeAriaLabel="Close Pinball"
-        >
-          <PinballGame isOpen={pinballOpen} />
-        </WindowFrame>
-      )}
-
-      {tetrisOpen && (
-        <WindowFrame
-          ref={tetrisRef}
-          className="tetris-window"
-          style={{ left: tetrisPos.x, top: tetrisPos.y, zIndex: getWindowZ("tetris") }}
-          onPointerDown={() => bringWindowToFront("tetris")}
-          ariaLabel="Tetris"
-          onHeaderPointerDown={onTetrisHeaderPointerDown}
-          title="Tetris"
-          onClose={closeTetris}
-          closeAriaLabel="Close Tetris"
-        >
-          <TetrisGame isOpen={tetrisOpen} />
-        </WindowFrame>
-      )}
+      <PropertiesWindow
+        open={isLoading || Boolean(error) || Boolean(siteInfo)}
+        windowRef={windowRef}
+        position={windowPos}
+        zIndex={getWindowZ("properties")}
+        onFocus={() => bringWindowToFront("properties")}
+        onHeaderPointerDown={onWindowHeaderPointerDown}
+        onClose={closeProperties}
+        isLoading={isLoading}
+        error={error}
+        siteInfo={siteInfo}
+      />
+      <ExplorerWindow
+        open={explorerOpen}
+        explorerRef={explorerRef}
+        position={explorerPos}
+        size={explorerSize}
+        zIndex={getWindowZ("explorer")}
+        onFocus={() => bringWindowToFront("explorer")}
+        onHeaderPointerDown={onExplorerHeaderPointerDown}
+        onClose={closeExplorer}
+        onResizePointerDown={onExplorerResizePointerDown}
+      />
+      <NotepadWindow
+        open={notepadOpen}
+        notepadRef={notepadRef}
+        position={notepadPos}
+        size={notepadSize}
+        zIndex={getWindowZ("notepad")}
+        onFocus={() => bringWindowToFront("notepad")}
+        onHeaderPointerDown={onNotepadHeaderPointerDown}
+        onClose={closeReadme}
+        onResizePointerDown={onNotepadResizePointerDown}
+        readmeContent={readmeContent}
+        onChangeReadmeContent={setReadmeContent}
+        readmeFontSize={readmeFontSize}
+        onChangeReadmeFontSize={changeReadmeFontSize}
+      />
+      <CmdWindow
+        open={cmdOpen}
+        cmdRef={cmdRef}
+        cmdOutputRef={cmdOutputRef}
+        position={cmdPos}
+        size={cmdSize}
+        zIndex={getWindowZ("cmd")}
+        onFocus={() => bringWindowToFront("cmd")}
+        onHeaderPointerDown={onCmdHeaderPointerDown}
+        onClose={closeCmd}
+        onResizePointerDown={onCmdResizePointerDown}
+        cmdFontSize={cmdFontSize}
+        onChangeCmdFontSize={changeCmdFontSize}
+        cmdLines={cmdLines}
+        cmdBusy={cmdBusy}
+        cmdInput={cmdInput}
+        onChangeCmdInput={setCmdInput}
+        onSubmit={() => void submitCmd()}
+      />
+      <GeminiKeyWindow
+        open={geminiOpen}
+        geminiRef={geminiRef}
+        position={geminiPos}
+        zIndex={getWindowZ("gemini")}
+        onFocus={() => bringWindowToFront("gemini")}
+        onHeaderPointerDown={onGeminiHeaderPointerDown}
+        onClose={closeGeminiKey}
+        geminiDraft={geminiDraft}
+        onChangeGeminiDraft={setGeminiDraft}
+        onSaveGeminiKey={saveGeminiKey}
+        geminiStatusMessage={geminiStatusMessage}
+        geminiApiKey={geminiApiKey}
+      />
+      <PinballWindow
+        open={pinballOpen}
+        pinballRef={pinballRef}
+        position={pinballPos}
+        size={pinballSize}
+        zIndex={getWindowZ("pinball")}
+        onFocus={() => bringWindowToFront("pinball")}
+        onHeaderPointerDown={onPinballHeaderPointerDown}
+        onClose={closePinball}
+      >
+        <PinballGame isOpen={pinballOpen} />
+      </PinballWindow>
+      <TetrisWindow
+        open={tetrisOpen}
+        tetrisRef={tetrisRef}
+        position={tetrisPos}
+        zIndex={getWindowZ("tetris")}
+        onFocus={() => bringWindowToFront("tetris")}
+        onHeaderPointerDown={onTetrisHeaderPointerDown}
+        onClose={closeTetris}
+      >
+        <TetrisGame isOpen={tetrisOpen} />
+      </TetrisWindow>
 
       <StartMenu
         isOpen={startMenuOpen}

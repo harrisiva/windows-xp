@@ -1,3 +1,7 @@
+/**
+ * Calculates pinball window dimensions that preserve game aspect ratio
+ * while fitting available viewport space above the taskbar.
+ */
 function calculateResponsivePinballSize(viewportWidth, viewportHeight, taskbarHeight) {
   const margin = 24;
   const minWindowWidth = 420;
@@ -30,6 +34,9 @@ function calculateResponsivePinballSize(viewportWidth, viewportHeight, taskbarHe
   return { width: windowWidth, height: windowHeight };
 }
 
+/**
+ * Converts markdown-ish Gemini output into terminal-friendly plain text.
+ */
 function formatGeminiOutputForCmd(rawText) {
   if (typeof rawText !== "string") {
     return "Gemini returned an empty response.";
