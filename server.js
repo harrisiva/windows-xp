@@ -1,4 +1,5 @@
 const express = require("express");
+const fs = require("fs");
 const path = require("path");
 let GoogleGenAI;
 try {
@@ -9,9 +10,15 @@ try {
 
 const app = express();
 const port = process.env.PORT || 3000;
+const distPath = path.join(__dirname, "dist");
+const distIndexPath = path.join(distPath, "index.html");
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+
+// In production, Express serves the built Vite assets.
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+}
 
 app.get("/api/site-info", (req, res) => {
   res.json({
@@ -172,7 +179,10 @@ app.post("/api/cmd-gemini", async (req, res) => {
 });
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  if (fs.existsSync(distIndexPath)) {
+    return res.sendFile(distIndexPath);
+  }
+  return res.status(404).send("Frontend build not found. Run `npm run dev` or `npm run build`.");
 });
 
 app.listen(port, () => {
