@@ -30,5 +30,4 @@ Codex helped me add Tetris, notepad, pinball (looks mid tho), and a few other ba
 
 ## AI in XP
 Got a FREE Gemini Key? Plug it into the shortcut and start chatting with AI through the OG CMD.
-
-<img width="1470" height="917" alt="image" src="https://github.com/user-attachments/assets/17720a95-de34-41ee-8c53-e38c9b010b54" />
+<img width="1470" height="918" alt="image" src="https://github.com/user-attachments/assets/7dc4548c-6986-444b-a453-9e8e1984d75d" />
