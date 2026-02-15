@@ -90,7 +90,6 @@ server.js                 # API endpoints + production static hosting
 ```
 
 ## Contributing
-
 Issues and PRs are welcome.
 
 If you propose UI changes, keep the XP visual language and interaction model consistent (dragging, taskbar behavior, window chrome, etc.).
