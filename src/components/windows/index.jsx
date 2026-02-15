@@ -132,6 +132,8 @@ export function NotepadWindow({
   if (!open) {
     return null;
   }
+  const lineCount = readmeContent ? readmeContent.split("\n").length : 1;
+  const charCount = readmeContent.length;
 
   return (
     <WindowFrame
@@ -166,6 +168,11 @@ export function NotepadWindow({
           style={{ fontSize: `${readmeFontSize}px` }}
           spellCheck={false}
         />
+      </div>
+      <div className="notepad-statusbar" aria-hidden="true">
+        <span>UTF-8</span>
+        <span>{lineCount} lines</span>
+        <span>{charCount} chars</span>
       </div>
     </WindowFrame>
   );

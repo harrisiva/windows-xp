@@ -1,34 +1,96 @@
-# Windows XP
-Vibe-coded web app with UI that gives a Windows XP vibe and offers some nostalgic features: pinball, Tetris, notepad, and paint. Also supercharged with a working AI chat through the nostalgic CMD.
+# Windows XP Desktop (Web Edition)
 
-Feel free to fork it, add more onto the AI slop, and send a MR if you have some dope ideas. 
+An interactive Windows XP-inspired desktop built with React + Vite + Express.
 
-Alternatively, create a new issue if you have an idea you want to see included.
+It recreates classic XP vibes while adding playful features like:
+- Draggable desktop icons and windows
+- Start menu and taskbar with open-window entries
+- `readme.txt` (editable per session)
+- CMD window with Gemini-backed responses
+- XP-style mini games (Pinball + Tetris)
+- Clippy assistant with chat bubble interactions
 
+## Preview
 
-# Setup
-Make sure you have node installed and execute the following commands:
+### Classic XP Desktop
+<img width="1470" height="917" alt="Windows XP desktop clone" src="https://github.com/user-attachments/assets/a11d6f9e-3702-4991-8d6d-b31d33dd5c1b" />
+
+### Apps + Games
+<img width="1470" height="917" alt="Windows XP apps and games" src="https://github.com/user-attachments/assets/ac76b140-d7b3-4f96-9e87-63ad8a0eaf3d" />
+
+### Gemini in CMD
+<img width="1470" height="917" alt="Gemini chat through command prompt" src="https://github.com/user-attachments/assets/17720a95-de34-41ee-8c53-e38c9b010b54" />
+
+## Tech Stack
+
+- Frontend: React 18 + Vite
+- Backend: Express
+- AI: `@google/genai`
+- Styling: Plain CSS (XP-themed custom UI)
+
+## Getting Started
+
+### 1. Install dependencies
+```bash
+npm install
 ```
-git clone https://github.com/harrisiva/windows-xp.git
-npm start
+
+### 2. Run in development (recommended)
+Use two terminals:
+
+Terminal A (API):
+```bash
+npm run dev:api
+```
+
+Terminal B (UI):
+```bash
+npm run dev:ui
+```
+
+Open `http://localhost:5173`.
+
+Notes:
+- Vite proxies `/api/*` requests to Express on `http://localhost:3000`.
+- Gemini key validation and CMD chat require the backend to be running.
+
+### 3. Run as production-like single server
+```bash
+npm run build
 npm start
 ```
-> Got stuck? Copy/paste the error and ask AI
 
-# Screenshots
+Open `http://localhost:3000`.
 
-## Classic XP Vibes
-I tried to get the dog right, but it looks funny lol (going to swap to clippy). Regardless, we have the OG vibe taskbar, start menu, windows, etc.
+## Gemini Setup
 
-<img width="1470" height="917" alt="image" src="https://github.com/user-attachments/assets/a11d6f9e-3702-4991-8d6d-b31d33dd5c1b" />
+1. Launch the app.
+2. Double-click the Gemini key shortcut on desktop.
+3. Paste your Gemini API key and save.
+4. Open CMD and send prompts.
 
-## Games and Basic Applications
-Codex helped me add Tetris, notepad, pinball (looks mid tho), and a few other basic applications.
+The key is stored only for the current browser session (refresh clears session UI state where applicable).
 
-<img width="1470" height="917" alt="image" src="https://github.com/user-attachments/assets/ac76b140-d7b3-4f96-9e87-63ad8a0eaf3d" />
+## Project Structure
 
+```text
+src/
+  components/
+    DesktopShell.jsx      # desktop/taskbar/start menu/clippy/ui shell
+    WindowFrame.jsx       # reusable XP-style window primitive
+    windows/index.jsx     # app windows (Explorer, Notepad, CMD, etc.)
+  constants/ui.js         # window ids/layout/constants
+  lib/
+    api.js                # frontend API helpers
+    config.js             # icon + assistant message defaults
+    games.jsx             # Pinball/Tetris implementations
+    utils.js              # formatting/sizing helpers
+  App.jsx                 # desktop orchestration and interaction state
+server.js                 # API endpoints + production static hosting
+```
 
-## AI in XP
-Got a FREE Gemini Key? Plug it into the shortcut and start chatting with AI through the OG CMD.
+## Contributing
 
-<img width="1470" height="917" alt="image" src="https://github.com/user-attachments/assets/17720a95-de34-41ee-8c53-e38c9b010b54" />
+Issues and PRs are welcome.
+
+If you propose UI changes, keep the XP visual language and interaction model consistent (dragging, taskbar behavior, window chrome, etc.).

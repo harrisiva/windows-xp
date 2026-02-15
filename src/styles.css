@@ -685,7 +685,7 @@ body,
 }
 
 .notepad-body {
-  height: calc(100% - 60px);
+  height: calc(100% - 82px);
   background: #ffffff;
   padding: 4px;
 }
@@ -702,6 +702,23 @@ body,
   padding: 8px;
   resize: none;
   outline: none;
+}
+
+.notepad-statusbar {
+  height: 22px;
+  border-top: 1px solid #b7cbe6;
+  background: linear-gradient(180deg, #f7fbff, #e7f0fb);
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #39577f;
+  font-size: 11px;
+}
+
+.notepad-statusbar span + span {
+  border-left: 1px solid #c7d7ec;
+  padding-left: 10px;
 }
 
 .notepad-resize-handle {
