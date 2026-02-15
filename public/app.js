@@ -747,6 +747,37 @@ function calculateResponsivePinballSize(viewportWidth, viewportHeight, taskbarHe
   return { width: windowWidth, height: windowHeight };
 }
 
+function formatGeminiOutputForCmd(rawText) {
+  if (typeof rawText !== "string") {
+    return "Gemini returned an empty response.";
+  }
+
+  let text = rawText.replace(/\r\n/g, "\n");
+
+  text = text.replace(/```([a-zA-Z0-9_-]+)?\n?([\s\S]*?)```/g, (_match, lang, code) => {
+    const header = lang ? `[${lang}]\n` : "";
+    return `${header}${String(code || "").replace(/\n+$/g, "")}`;
+  });
+
+  text = text.replace(/`([^`]+)`/g, "$1");
+  text = text.replace(/^#{1,6}\s*/gm, "");
+  text = text.replace(/\*\*([^*]+)\*\*/g, "$1");
+  text = text.replace(/\*([^*\n]+)\*/g, "$1");
+  text = text.replace(/_([^_\n]+)_/g, "$1");
+  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1 ($2)");
+  text = text.replace(/^\s*>\s?/gm, "| ");
+  text = text.replace(/^\s*[-*+]\s+/gm, "• ");
+  text = text.replace(/^\s*\d+\.\s+/gm, (value) => value.trimStart());
+  text = text.replace(/^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/gm, "----------------");
+  text = text
+    .split("\n")
+    .map((line) => line.replace(/[ \t]+$/g, ""))
+    .join("\n");
+  text = text.replace(/\n{3,}/g, "\n\n").trim();
+
+  return text || "Gemini returned an empty response.";
+}
+
 function App() {
   const GEMINI_KEY_GLOBAL = "__geminiApiKeySession";
   const TASKBAR_HEIGHT = 40;
@@ -1290,7 +1321,10 @@ function App() {
       if (!response.ok || !payload?.ok) {
         throw new Error(payload?.message || "Gemini request failed.");
       }
-      setCmdLines((prev) => [...prev, { kind: "gemini", text: payload.response }]);
+      setCmdLines((prev) => [
+        ...prev,
+        { kind: "gemini", text: formatGeminiOutputForCmd(payload.response) },
+      ]);
     } catch (err) {
       setCmdLines((prev) => [...prev, { kind: "error", text: err?.message || "Gemini request failed." }]);
     } finally {
