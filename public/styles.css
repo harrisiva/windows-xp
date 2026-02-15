@@ -406,6 +406,85 @@ body,
   z-index: 36;
 }
 
+.cmd-window {
+  position: fixed;
+  width: min(920px, calc(100vw - 24px));
+  height: min(520px, calc(100vh - 64px));
+  border: 2px solid #e3e3e3;
+  border-radius: 4px;
+  background: #c9c9c9;
+  box-shadow: 0 9px 20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.cmd-header {
+  border-bottom-color: #c4d8ff;
+}
+
+.cmd-body {
+  height: calc(100% - 32px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #ffffff;
+  background: #000000;
+}
+
+.cmd-output {
+  flex: 1;
+  overflow: auto;
+  padding: 8px 10px 6px;
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.35;
+  color: #f2f2f2;
+}
+
+.cmd-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cmd-line--user {
+  color: #d4d4d4;
+}
+
+.cmd-line--gemini {
+  color: #f3f3f3;
+}
+
+.cmd-line--system {
+  color: #b8b8b8;
+}
+
+.cmd-line--error {
+  color: #ff8080;
+}
+
+.cmd-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 8px;
+  border-top: 1px solid #1f1f1f;
+  background: #000000;
+  font-family: "Lucida Console", "Courier New", monospace;
+  font-size: 14px;
+}
+
+.cmd-prompt {
+  color: #f2f2f2;
+  white-space: nowrap;
+}
+
+.cmd-input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: #000000;
+  color: #ffffff;
+  font: inherit;
+}
+
 .gemini-window {
   position: fixed;
   width: min(540px, calc(100vw - 24px));
@@ -1125,6 +1204,10 @@ body,
 
 .taskbar-window-dot--notepad {
   background: linear-gradient(180deg, #ffffff 0%, #d4e2f8 100%);
+}
+
+.taskbar-window-dot--cmd {
+  background: linear-gradient(180deg, #4f4f4f 0%, #151515 100%);
 }
 
 .taskbar-window-dot--gemini {

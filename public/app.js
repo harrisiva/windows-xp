@@ -759,6 +759,7 @@ function App() {
   const [siteInfo, setSiteInfo] = useState(null);
   const [explorerOpen, setExplorerOpen] = useState(false);
   const [notepadOpen, setNotepadOpen] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
   const [geminiOpen, setGeminiOpen] = useState(false);
   const [pinballOpen, setPinballOpen] = useState(false);
   const [tetrisOpen, setTetrisOpen] = useState(false);
@@ -766,6 +767,7 @@ function App() {
     "properties",
     "explorer",
     "notepad",
+    "cmd",
     "gemini",
     "pinball",
     "tetris",
@@ -781,6 +783,7 @@ function App() {
   const [explorerSize, setExplorerSize] = useState({ width: 640, height: 430 });
   const [notepadPos, setNotepadPos] = useState({ x: 220, y: 110 });
   const [notepadSize, setNotepadSize] = useState({ width: 620, height: 440 });
+  const [cmdPos, setCmdPos] = useState({ x: 130, y: 84 });
   const [geminiPos, setGeminiPos] = useState({ x: 280, y: 138 });
   const [pinballPos, setPinballPos] = useState({ x: 200, y: 86 });
   const [pinballSize, setPinballSize] = useState(() => {
@@ -803,6 +806,14 @@ function App() {
   });
   const [geminiStatus, setGeminiStatus] = useState("inactive");
   const [geminiStatusMessage, setGeminiStatusMessage] = useState("No API key validated yet.");
+  const [cmdInput, setCmdInput] = useState("");
+  const [cmdBusy, setCmdBusy] = useState(false);
+  const [cmdLines, setCmdLines] = useState([
+    { kind: "system", text: "Microsoft Windows XP [Version 5.1.2600]" },
+    { kind: "system", text: "(C) Copyright 1985-2001 Microsoft Corp." },
+    { kind: "blank", text: "" },
+    { kind: "system", text: "Type a prompt and press Enter to chat with Gemini." },
+  ]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [windowPos, setWindowPos] = useState({ x: 120, y: 120 });
@@ -812,6 +823,8 @@ function App() {
   const windowRef = useRef(null);
   const explorerRef = useRef(null);
   const notepadRef = useRef(null);
+  const cmdRef = useRef(null);
+  const cmdOutputRef = useRef(null);
   const geminiRef = useRef(null);
   const pinballRef = useRef(null);
   const tetrisRef = useRef(null);
@@ -874,6 +887,16 @@ function App() {
       window[GEMINI_KEY_GLOBAL] = geminiApiKey;
     }
   }, [geminiApiKey]);
+
+  useEffect(() => {
+    if (!cmdOpen) {
+      return;
+    }
+    const outputEl = cmdOutputRef.current;
+    if (outputEl) {
+      outputEl.scrollTop = outputEl.scrollHeight;
+    }
+  }, [cmdLines, cmdOpen]);
 
   useEffect(() => {
     function closeMenu() {
@@ -982,6 +1005,17 @@ function App() {
       };
     }
 
+    function clampCmdToViewport(x, y, width, height) {
+      const margin = 12;
+      const cmdWidth = width || cmdRef.current?.offsetWidth || 940;
+      const cmdHeight = height || cmdRef.current?.offsetHeight || 520;
+      const maxY = Math.max(margin, window.innerHeight - TASKBAR_HEIGHT - cmdHeight - margin);
+      return {
+        x: Math.min(Math.max(margin, x), Math.max(margin, window.innerWidth - cmdWidth - margin)),
+        y: Math.min(Math.max(margin, y), maxY),
+      };
+    }
+
     function clampGeminiToViewport(x, y, width, height) {
       const margin = 12;
       const geminiWidth = width || geminiRef.current?.offsetWidth || 540;
@@ -1053,6 +1087,12 @@ function App() {
         setNotepadPos(clampNotepadToViewport(nextX, nextY));
       }
 
+      if (dragState.current.target === "cmd-window") {
+        const nextX = event.clientX - dragState.current.offsetX;
+        const nextY = event.clientY - dragState.current.offsetY;
+        setCmdPos(clampCmdToViewport(nextX, nextY));
+      }
+
       if (dragState.current.target === "pinball-window") {
         const nextX = event.clientX - dragState.current.offsetX;
         const nextY = event.clientY - dragState.current.offsetY;
@@ -1118,6 +1158,7 @@ function App() {
       setExplorerPos((prev) => clampExplorerToViewport(prev.x, prev.y));
       setNotepadSize((prev) => clampNotepadSizeToViewport(prev.width, prev.height));
       setNotepadPos((prev) => clampNotepadToViewport(prev.x, prev.y));
+      setCmdPos((prev) => clampCmdToViewport(prev.x, prev.y));
       setGeminiPos((prev) => clampGeminiToViewport(prev.x, prev.y));
       const nextPinballSize = getResponsivePinballSize();
       setPinballSize(nextPinballSize);
@@ -1183,6 +1224,52 @@ function App() {
 
   function closeReadme() {
     setNotepadOpen(false);
+  }
+
+  function openCmd() {
+    bringWindowToFront("cmd");
+    setCmdOpen(true);
+  }
+
+  function closeCmd() {
+    setCmdOpen(false);
+  }
+
+  async function submitCmd() {
+    const prompt = cmdInput.trim();
+    if (!prompt || cmdBusy) {
+      return;
+    }
+
+    setCmdInput("");
+    setCmdBusy(true);
+    setCmdLines((prev) => [...prev, { kind: "user", text: `C:\\> ${prompt}` }]);
+
+    if (!geminiApiKey.trim()) {
+      setCmdLines((prev) => [
+        ...prev,
+        { kind: "error", text: "Gemini API key missing. Open Gemini API Key shortcut and save a key first." },
+      ]);
+      setCmdBusy(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/cmd-gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: geminiApiKey.trim(), prompt }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.ok) {
+        throw new Error(payload?.message || "Gemini request failed.");
+      }
+      setCmdLines((prev) => [...prev, { kind: "gemini", text: payload.response }]);
+    } catch (err) {
+      setCmdLines((prev) => [...prev, { kind: "error", text: err?.message || "Gemini request failed." }]);
+    } finally {
+      setCmdBusy(false);
+    }
   }
 
   function openGeminiKey() {
@@ -1353,6 +1440,29 @@ function App() {
 
     dragState.current = {
       target: "notepad-window",
+      id: null,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    document.body.classList.add("is-dragging");
+  }
+
+  function onCmdHeaderPointerDown(event) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    if (event.target.closest("button")) {
+      return;
+    }
+
+    const rect = cmdRef.current?.getBoundingClientRect();
+    if (!rect) {
+      return;
+    }
+
+    dragState.current = {
+      target: "cmd-window",
       id: null,
       offsetX: event.clientX - rect.left,
       offsetY: event.clientY - rect.top,
@@ -1559,6 +1669,7 @@ function App() {
     (isLoading || error || siteInfo) && { id: "properties", label: "My Computer Properties", kind: "properties" },
     explorerOpen && { id: "explorer", label: "My Computer", kind: "explorer" },
     notepadOpen && { id: "notepad", label: "readme.txt - Notepad", kind: "notepad" },
+    cmdOpen && { id: "cmd", label: "C:\\WINDOWS\\system32\\cmd.exe", kind: "cmd" },
     geminiOpen && { id: "gemini", label: "Gemini API Key", kind: "gemini" },
     pinballOpen && { id: "pinball", label: "3D Pinball", kind: "pinball" },
     tetrisOpen && { id: "tetris", label: "Tetris", kind: "tetris" },
@@ -1614,8 +1725,10 @@ function App() {
           onDoubleClick={
             icon.id === "computer"
               ? openExplorer
-                : icon.id === "readme"
+              : icon.id === "readme"
                 ? openReadme
+              : icon.id === "cmd"
+                ? openCmd
                 : icon.id === "gemini"
                   ? openGeminiKey
                 : icon.id === "pinball"
@@ -1846,6 +1959,52 @@ function App() {
             onPointerDown={onNotepadResizePointerDown}
             aria-hidden="true"
           />
+        </section>
+      )}
+
+      {cmdOpen && (
+        <section
+          ref={cmdRef}
+          className="cmd-window"
+          style={{ left: cmdPos.x, top: cmdPos.y, zIndex: getWindowZ("cmd") }}
+          onPointerDown={() => bringWindowToFront("cmd")}
+          role="dialog"
+          aria-label="Command Prompt"
+        >
+          <div className="window-header cmd-header" onPointerDown={onCmdHeaderPointerDown}>
+            <span className="window-title">C:\WINDOWS\system32\cmd.exe</span>
+            <button className="close-btn" onClick={closeCmd} aria-label="Close Command Prompt">
+              ×
+            </button>
+          </div>
+          <div className="cmd-body">
+            <div className="cmd-output" ref={cmdOutputRef}>
+              {cmdLines.map((line, index) => (
+                <div key={`cmd-line-${index}`} className={`cmd-line cmd-line--${line.kind}`}>
+                  {line.text}
+                </div>
+              ))}
+              {cmdBusy && <div className="cmd-line cmd-line--system">Gemini is thinking...</div>}
+            </div>
+            <form
+              className="cmd-input-row"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void submitCmd();
+              }}
+            >
+              <span className="cmd-prompt">C:\&gt;</span>
+              <input
+                className="cmd-input"
+                type="text"
+                value={cmdInput}
+                onChange={(event) => setCmdInput(event.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                disabled={cmdBusy}
+              />
+            </form>
+          </div>
         </section>
       )}
 

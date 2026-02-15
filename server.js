@@ -114,6 +114,63 @@ app.post("/api/validate-gemini-key", async (req, res) => {
   }
 });
 
+app.post("/api/cmd-gemini", async (req, res) => {
+  const apiKey = typeof req.body?.apiKey === "string" ? req.body.apiKey.trim() : "";
+  const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim() : "";
+
+  if (!apiKey) {
+    return res.status(400).json({
+      ok: false,
+      message: "Missing Gemini API key.",
+    });
+  }
+
+  if (!prompt) {
+    return res.status(400).json({
+      ok: false,
+      message: "Missing prompt input.",
+    });
+  }
+
+  if (!GoogleGenAI) {
+    return res.status(500).json({
+      ok: false,
+      message: "Gemini SDK not installed.",
+    });
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    let text = "";
+    if (typeof result?.text === "function") {
+      text = result.text();
+    } else if (typeof result?.text === "string") {
+      text = result.text;
+    } else {
+      const parts = result?.candidates?.[0]?.content?.parts;
+      if (Array.isArray(parts)) {
+        text = parts.map((part) => part?.text || "").join("").trim();
+      }
+    }
+
+    return res.json({
+      ok: true,
+      response: text || "Gemini returned an empty response.",
+    });
+  } catch (error) {
+    const message = typeof error?.message === "string" ? error.message : "Gemini request failed.";
+    return res.status(502).json({
+      ok: false,
+      message,
+    });
+  }
+});
+
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
