@@ -16,6 +16,7 @@ import {
   ExplorerWindow,
   GeminiKeyWindow,
   NotepadWindow,
+  PaintWindow,
   PinballWindow,
   PropertiesWindow,
   TetrisWindow,
@@ -48,6 +49,7 @@ function App() {
   const [notepadOpen, setNotepadOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [geminiOpen, setGeminiOpen] = useState(false);
+  const [paintOpen, setPaintOpen] = useState(false);
   const [pinballOpen, setPinballOpen] = useState(false);
   const [tetrisOpen, setTetrisOpen] = useState(false);
   const [windowStack, setWindowStack] = useState([
@@ -56,6 +58,7 @@ function App() {
     WINDOW_IDS.NOTEPAD,
     WINDOW_IDS.CMD,
     WINDOW_IDS.GEMINI,
+    WINDOW_IDS.PAINT,
     WINDOW_IDS.PINBALL,
     WINDOW_IDS.TETRIS,
   ]);
@@ -74,6 +77,8 @@ function App() {
   const [cmdPos, setCmdPos] = useState({ x: 130, y: 84 });
   const [cmdSize, setCmdSize] = useState({ width: 920, height: 520 });
   const [geminiPos, setGeminiPos] = useState({ x: 280, y: 138 });
+  const [paintPos, setPaintPos] = useState({ x: 240, y: 92 });
+  const [paintSize, setPaintSize] = useState({ width: 760, height: 520 });
   const [pinballPos, setPinballPos] = useState({ x: 200, y: 86 });
   const [pinballSize, setPinballSize] = useState(() => {
     const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
@@ -128,6 +133,7 @@ function App() {
   const cmdRef = useRef(null);
   const cmdOutputRef = useRef(null);
   const geminiRef = useRef(null);
+  const paintRef = useRef(null);
   const desktopGeminiRef = useRef(null);
   const pinballRef = useRef(null);
   const tetrisRef = useRef(null);
@@ -364,6 +370,32 @@ function App() {
       };
     }
 
+    function clampPaintToViewport(x, y, width, height) {
+      const margin = 12;
+      const paintWidth = width || paintRef.current?.offsetWidth || 760;
+      const paintHeight = height || paintRef.current?.offsetHeight || 520;
+      const maxY = Math.max(margin, window.innerHeight - TASKBAR_HEIGHT - paintHeight - margin);
+      return {
+        x: Math.min(Math.max(margin, x), Math.max(margin, window.innerWidth - paintWidth - margin)),
+        y: Math.min(Math.max(margin, y), maxY),
+      };
+    }
+
+    function clampPaintSizeToViewport(width, height, x, y) {
+      const margin = 12;
+      const minWidth = 500;
+      const minHeight = 340;
+      const paintRect = paintRef.current?.getBoundingClientRect();
+      const left = x ?? paintRect?.left ?? 240;
+      const top = y ?? paintRect?.top ?? 92;
+      const maxWidth = Math.max(minWidth, window.innerWidth - left - margin);
+      const maxHeight = Math.max(minHeight, window.innerHeight - TASKBAR_HEIGHT - top - margin);
+      return {
+        width: Math.min(Math.max(minWidth, width), maxWidth),
+        height: Math.min(Math.max(minHeight, height), maxHeight),
+      };
+    }
+
     function clampPinballToViewport(x, y, width, height) {
       const margin = 12;
       const pinballWidth = width || pinballRef.current?.offsetWidth || 610;
@@ -462,6 +494,12 @@ function App() {
         setTetrisPos(clampTetrisToViewport(nextX, nextY));
       }
 
+      if (dragState.current.target === "paint-window") {
+        const nextX = event.clientX - dragState.current.offsetX;
+        const nextY = event.clientY - dragState.current.offsetY;
+        setPaintPos(clampPaintToViewport(nextX, nextY));
+      }
+
       if (dragState.current.target === "desktop-gemini-status") {
         const nextX = event.clientX - dragState.current.offsetX;
         const nextY = event.clientY - dragState.current.offsetY;
@@ -491,6 +529,14 @@ function App() {
         const nextWidth = dragState.current.startWidth + deltaX;
         const nextHeight = dragState.current.startHeight + deltaY;
         setCmdSize(clampCmdSizeToViewport(nextWidth, nextHeight));
+      }
+
+      if (dragState.current.target === "paint-resize") {
+        const deltaX = event.clientX - dragState.current.startX;
+        const deltaY = event.clientY - dragState.current.startY;
+        const nextWidth = dragState.current.startWidth + deltaX;
+        const nextHeight = dragState.current.startHeight + deltaY;
+        setPaintSize(clampPaintSizeToViewport(nextWidth, nextHeight));
       }
 
       if (dragState.current.target === "icon") {
@@ -530,6 +576,8 @@ function App() {
       setCmdSize((prev) => clampCmdSizeToViewport(prev.width, prev.height));
       setCmdPos((prev) => clampCmdToViewport(prev.x, prev.y));
       setGeminiPos((prev) => clampGeminiToViewport(prev.x, prev.y));
+      setPaintSize((prev) => clampPaintSizeToViewport(prev.width, prev.height));
+      setPaintPos((prev) => clampPaintToViewport(prev.x, prev.y));
       const nextPinballSize = getResponsivePinballSize();
       setPinballSize(nextPinballSize);
       setPinballPos((prev) =>
@@ -603,6 +651,16 @@ function App() {
 
   function closeCmd() {
     setCmdOpen(false);
+  }
+
+  function openPaint() {
+    bringWindowToFront("paint");
+    setPaintOpen(true);
+    setStartMenuOpen(false);
+  }
+
+  function closePaint() {
+    setPaintOpen(false);
   }
 
   /**
@@ -818,6 +876,14 @@ function App() {
     startWindowDrag(event, "tetris-window", tetrisRef);
   }
 
+  function onPaintHeaderPointerDown(event) {
+    startWindowDrag(event, "paint-window", paintRef);
+  }
+
+  function onPaintResizePointerDown(event) {
+    startResizeDrag(event, "paint-resize", paintSize.width, paintSize.height);
+  }
+
   function onDesktopGeminiStatusPointerDown(event) {
     startWindowDrag(event, "desktop-gemini-status", desktopGeminiRef);
   }
@@ -855,6 +921,7 @@ function App() {
     notepadOpen && { id: WINDOW_IDS.NOTEPAD, label: "readme.txt - Notepad", kind: WINDOW_IDS.NOTEPAD },
     cmdOpen && { id: WINDOW_IDS.CMD, label: "C:\\WINDOWS\\system32\\cmd.exe", kind: WINDOW_IDS.CMD },
     geminiOpen && { id: WINDOW_IDS.GEMINI, label: "Gemini API Key", kind: WINDOW_IDS.GEMINI },
+    paintOpen && { id: WINDOW_IDS.PAINT, label: "untitled - Paint", kind: WINDOW_IDS.PAINT },
     pinballOpen && { id: WINDOW_IDS.PINBALL, label: "3D Pinball", kind: WINDOW_IDS.PINBALL },
     tetrisOpen && { id: WINDOW_IDS.TETRIS, label: "Tetris", kind: WINDOW_IDS.TETRIS },
   ].filter(Boolean);
@@ -881,10 +948,12 @@ function App() {
     readme: openReadme,
     cmd: openCmd,
     gemini: openGeminiKey,
+    paint: openPaint,
     pinball: openPinball,
     tetris: openTetris,
   };
   const startMenuActions = {
+    openPaint,
     openPinball,
     openTetris,
   };
@@ -988,6 +1057,17 @@ function App() {
         onSaveGeminiKey={saveGeminiKey}
         geminiStatusMessage={geminiStatusMessage}
         geminiApiKey={geminiApiKey}
+      />
+      <PaintWindow
+        open={paintOpen}
+        paintRef={paintRef}
+        position={paintPos}
+        size={paintSize}
+        zIndex={getWindowZ("paint")}
+        onFocus={() => bringWindowToFront("paint")}
+        onHeaderPointerDown={onPaintHeaderPointerDown}
+        onClose={closePaint}
+        onResizePointerDown={onPaintResizePointerDown}
       />
       <PinballWindow
         open={pinballOpen}

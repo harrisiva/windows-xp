@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import WindowFrame from "../WindowFrame";
 
 /**
@@ -311,6 +312,202 @@ export function GeminiKeyWindow({
           <div>Current session key: {geminiApiKey || "(none)"}</div>
         </div>
       </div>
+    </WindowFrame>
+  );
+}
+
+/**
+ * XP Paint-like drawing surface with pen/freehand tool only.
+ */
+export function PaintWindow({
+  open,
+  paintRef,
+  position,
+  size,
+  zIndex,
+  onFocus,
+  onHeaderPointerDown,
+  onClose,
+  onResizePointerDown,
+}) {
+  const canvasRef = useRef(null);
+  const canvasHostRef = useRef(null);
+  const drawRef = useRef({ active: false, lastX: 0, lastY: 0 });
+  const [penSize, setPenSize] = useState(2);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const canvas = canvasRef.current;
+    const host = canvasHostRef.current;
+    if (!canvas || !host) {
+      return;
+    }
+
+    function resizeCanvasPreservingContent() {
+      const oldWidth = canvas.width;
+      const oldHeight = canvas.height;
+      const snapshot = document.createElement("canvas");
+      snapshot.width = oldWidth || 1;
+      snapshot.height = oldHeight || 1;
+      const snapCtx = snapshot.getContext("2d");
+      if (snapCtx && oldWidth && oldHeight) {
+        snapCtx.drawImage(canvas, 0, 0);
+      }
+
+      const nextWidth = Math.max(260, Math.floor(host.clientWidth));
+      const nextHeight = Math.max(200, Math.floor(host.clientHeight));
+      canvas.width = nextWidth;
+      canvas.height = nextHeight;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        return;
+      }
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, nextWidth, nextHeight);
+      ctx.drawImage(snapshot, 0, 0, Math.min(snapshot.width, nextWidth), Math.min(snapshot.height, nextHeight));
+    }
+
+    resizeCanvasPreservingContent();
+    const resizeObserver = new ResizeObserver(() => resizeCanvasPreservingContent());
+    resizeObserver.observe(host);
+
+    return () => resizeObserver.disconnect();
+  }, [open]);
+
+  if (!open) {
+    return null;
+  }
+
+  function getPointFromEvent(event) {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return { x: 0, y: 0 };
+    }
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(canvas.width, event.clientX - rect.left)),
+      y: Math.max(0, Math.min(canvas.height, event.clientY - rect.top)),
+    };
+  }
+
+  function startDraw(event) {
+    if (event.button !== 0) {
+      return;
+    }
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) {
+      return;
+    }
+
+    const point = getPointFromEvent(event);
+    drawRef.current = { active: true, lastX: point.x, lastY: point.y };
+    ctx.strokeStyle = "#121212";
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.lineWidth = penSize;
+    ctx.beginPath();
+    ctx.moveTo(point.x, point.y);
+    ctx.lineTo(point.x + 0.01, point.y + 0.01);
+    ctx.stroke();
+    canvas.setPointerCapture(event.pointerId);
+  }
+
+  function moveDraw(event) {
+    if (!drawRef.current.active) {
+      return;
+    }
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) {
+      return;
+    }
+
+    const point = getPointFromEvent(event);
+    ctx.strokeStyle = "#121212";
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.lineWidth = penSize;
+    ctx.beginPath();
+    ctx.moveTo(drawRef.current.lastX, drawRef.current.lastY);
+    ctx.lineTo(point.x, point.y);
+    ctx.stroke();
+    drawRef.current.lastX = point.x;
+    drawRef.current.lastY = point.y;
+  }
+
+  function endDraw(event) {
+    const canvas = canvasRef.current;
+    drawRef.current.active = false;
+    if (canvas && canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function clearCanvas() {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) {
+      return;
+    }
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  return (
+    <WindowFrame
+      ref={paintRef}
+      className="paint-window"
+      style={{ left: position.x, top: position.y, width: size.width, height: size.height, zIndex }}
+      onPointerDown={onFocus}
+      ariaLabel="Paint"
+      onHeaderPointerDown={onHeaderPointerDown}
+      title="untitled - Paint"
+      onClose={onClose}
+      closeAriaLabel="Close Paint"
+      resizeHandle={<div className="paint-resize-handle" onPointerDown={onResizePointerDown} aria-hidden="true" />}
+    >
+      <div className="paint-menu-row">
+        <button type="button" className="toolbar-btn">File</button>
+        <button type="button" className="toolbar-btn">Edit</button>
+        <button type="button" className="toolbar-btn">View</button>
+        <button type="button" className="toolbar-btn">Image</button>
+        <button type="button" className="toolbar-btn">Colors</button>
+        <button type="button" className="toolbar-btn">Help</button>
+      </div>
+      <div className="paint-toolbar">
+        <button type="button" className="toolbar-btn paint-tool-btn paint-tool-btn--active">✎ Pen</button>
+        <label className="paint-size">
+          Size
+          <select
+            value={penSize}
+            onChange={(event) => setPenSize(Number(event.target.value))}
+          >
+            <option value={1}>1 px</option>
+            <option value={2}>2 px</option>
+            <option value={3}>3 px</option>
+            <option value={5}>5 px</option>
+            <option value={7}>7 px</option>
+          </select>
+        </label>
+        <button type="button" className="toolbar-btn" onClick={clearCanvas}>Clear</button>
+      </div>
+      <div className="paint-canvas-shell" ref={canvasHostRef}>
+        <canvas
+          ref={canvasRef}
+          className="paint-canvas"
+          onPointerDown={startDraw}
+          onPointerMove={moveDraw}
+          onPointerUp={endDraw}
+          onPointerCancel={endDraw}
+          onPointerLeave={endDraw}
+        />
+      </div>
+      <div className="paint-statusbar" aria-hidden="true">Ready | Tool: Pen | Drag to draw freehand</div>
     </WindowFrame>
   );
 }

@@ -72,6 +72,25 @@ function IconGraphic({ type }) {
     );
   }
 
+  if (type === "paint-app") {
+    return (
+      <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="paintPalette" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#ffe8b9" />
+            <stop offset="100%" stopColor="#d6a867" />
+          </linearGradient>
+        </defs>
+        <path d="M33 9c12 0 21 8 21 18 0 9-7 15-16 15h-4c-2 0-3 1-3 3v3c0 4-3 7-7 7-7 0-14-6-14-14C10 24 20 9 33 9z" fill="url(#paintPalette)" stroke="#8a6235" strokeWidth="2" />
+        <circle cx="24" cy="22" r="3.5" fill="#ef4d44" />
+        <circle cx="32" cy="18" r="3.5" fill="#4c93e6" />
+        <circle cx="40" cy="23" r="3.5" fill="#f5d253" />
+        <path d="M42 42l9-9 4 4-9 9-5 1z" fill="#8b5a34" stroke="#4f341f" strokeWidth="1.5" />
+        <path d="M51 33l4-4 4 4-4 4z" fill="#d8dee8" stroke="#6f7686" strokeWidth="1.3" />
+      </svg>
+    );
+  }
+
   if (type === "tetris-app") {
     return (
       <svg className="icon-svg" viewBox="0 0 64 64" aria-hidden="true">

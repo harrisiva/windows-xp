@@ -5,6 +5,7 @@ const DEFAULT_ICONS = [
   { id: "cmd", label: "Command Prompt", type: "cmd-shortcut" },
   { id: "readme", label: "readme.txt", type: "text-file" },
   { id: "gemini", label: "Gemini API Key", type: "gemini-shortcut" },
+  { id: "paint", label: "Paint", type: "paint-app" },
   { id: "pinball", label: "3D Pinball", type: "pinball-app" },
   { id: "tetris", label: "Tetris", type: "tetris-app" },
 ];

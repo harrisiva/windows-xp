@@ -19,6 +19,7 @@ export const WINDOW_IDS = Object.freeze({
   NOTEPAD: "notepad",
   CMD: "cmd",
   GEMINI: "gemini",
+  PAINT: "paint",
   PINBALL: "pinball",
   TETRIS: "tetris",
 });
@@ -38,6 +39,7 @@ export const START_MENU_LEFT_ITEMS = Object.freeze([
   { id: "pictures", label: "My Pictures" },
   { id: "music", label: "My Music" },
   { id: "recent", label: "My Recent Documents" },
+  { id: "paint", label: "Paint", action: "openPaint" },
   { id: "pinball", label: "3D Pinball", action: "openPinball" },
   { id: "tetris", label: "Tetris", action: "openTetris" },
 ]);
